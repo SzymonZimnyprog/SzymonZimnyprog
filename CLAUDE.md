@@ -2,133 +2,167 @@
 
 This file provides guidance to AI assistants (Claude, etc.) working in this repository.
 
-## Repository Status
-
-This is a freshly initialized repository with no source code yet. This CLAUDE.md establishes conventions and workflows to follow as the project grows.
-
 ## Project Overview
 
-- **Repository**: SzymonZimnyprog/SzymonZimnyprog
-- **Status**: Initialized, awaiting project files
-- **Branch strategy**: Feature branches prefixed with `claude/` for AI-assisted sessions
+Full-stack web application:
+- **Backend**: Python 3.12 + FastAPI — REST API served at `http://localhost:8000`
+- **Frontend**: React 18 + TypeScript + Vite — dev server at `http://localhost:5173`
+
+The frontend proxies all `/api/*` requests to the backend (configured in `vite.config.ts`).
+
+## Repository Structure
+
+```
+/
+├── CLAUDE.md                  # This file
+├── Makefile                   # Developer shortcuts
+├── docker-compose.yml         # Runs backend + frontend together
+├── pyproject.toml             # Python tool config (pytest, ruff)
+├── .gitignore
+│
+├── backend/
+│   ├── main.py                # FastAPI app entry point
+│   ├── requirements.txt       # Production dependencies
+│   ├── requirements-dev.txt   # Dev/test dependencies
+│   ├── .env.example           # Env var template — copy to .env
+│   ├── Dockerfile
+│   ├── routers/
+│   │   └── items.py           # Example CRUD router
+│   └── tests/
+│       └── test_items.py
+│
+└── frontend/
+    ├── index.html
+    ├── package.json
+    ├── tsconfig.json
+    ├── vite.config.ts
+    ├── Dockerfile
+    └── src/
+        ├── main.tsx           # React entry point
+        ├── App.tsx            # Root component
+        ├── App.test.tsx       # Component tests (Vitest)
+        ├── api.ts             # Typed API client (fetch wrapper)
+        ├── index.css
+        └── App.css
+```
+
+## Development Setup
+
+### First-time setup
+
+```bash
+# Create Python virtual env and install all deps
+make install
+```
+
+### Running locally (two terminals)
+
+```bash
+# Terminal 1 — backend (hot reload)
+make dev-backend
+
+# Terminal 2 — frontend (HMR)
+make dev-frontend
+```
+
+### Running with Docker Compose
+
+```bash
+make dev
+# or
+docker compose up --build
+```
+
+### Environment variables
+
+```bash
+cp backend/.env.example backend/.env
+# Edit backend/.env as needed
+```
+
+## Testing
+
+```bash
+make test          # run all tests
+make test-backend  # pytest (backend/tests/)
+make test-frontend # vitest (frontend/src/*.test.tsx)
+```
+
+Backend tests use FastAPI's `TestClient` (synchronous, no server needed).
+Frontend tests use Vitest + React Testing Library.
+
+## Linting & Formatting
+
+```bash
+make lint          # ruff check + eslint
+make format        # ruff format (Python only)
+```
+
+Python: `ruff` (lint + format). Config in `pyproject.toml`.
+TypeScript: ESLint. Config in `frontend/.eslintrc` (add as needed).
+
+## Key Conventions
+
+### Backend (Python / FastAPI)
+
+- All routes live in `backend/routers/`. Each file = one logical resource.
+- Register routers in `backend/main.py` with a path prefix and tag.
+- Use Pydantic models for request/response validation — never raw dicts.
+- Use `HTTPException` for error responses with appropriate status codes.
+- In-memory store is a placeholder — replace with a real DB (SQLAlchemy + Alembic recommended).
+
+### Frontend (React / TypeScript)
+
+- All API calls go through `src/api.ts` — never call `fetch` directly in components.
+- Components live in `src/components/` (create as needed).
+- Pages live in `src/pages/` (create as needed when adding routing).
+- Use functional components and hooks only — no class components.
+- Keep components small and focused; extract logic into custom hooks when reused.
+
+### General
+
+- **No secrets in git** — use `.env` files (covered by `.gitignore`).
+- Validate input at boundaries (API and form level); trust internal data.
+- Do not add dependencies without a clear reason.
 
 ## Git Conventions
 
 ### Branch Naming
 
-- `main` / `master` — stable production branch
-- `feature/<short-description>` — new features
-- `fix/<short-description>` — bug fixes
-- `claude/<session-id>` — AI-assisted session branches (auto-generated)
+- `main` — stable production branch
+- `feature/<description>` — new features
+- `fix/<description>` — bug fixes
+- `claude/<session-id>` — AI-assisted branches (auto-generated)
 
-### Commit Messages
-
-Follow conventional commits format:
+### Commit Messages (Conventional Commits)
 
 ```
-<type>(<scope>): <short summary>
-
-[optional body]
-[optional footer]
+<type>(<scope>): <summary>
 ```
 
-**Types**: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `ci`
+Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `ci`
 
-Examples:
 ```
-feat(auth): add JWT token validation
-fix(api): handle null response from external service
-docs: update CLAUDE.md with project conventions
-```
-
-### Git Workflow
-
-1. Always develop on a feature branch, never directly on `main`.
-2. Push with tracking: `git push -u origin <branch-name>`
-3. Keep commits atomic and focused on a single concern.
-4. Do not force-push to shared branches without explicit permission.
-
-## Development Workflows
-
-### Before Starting Work
-
-```bash
-git fetch origin
-git checkout -b feature/<name> origin/main
-```
-
-### Running the Project
-
-> Update this section once the project stack is chosen.
-
-```bash
-# Placeholder — add actual commands here
-# e.g., npm install && npm run dev
-# e.g., pip install -r requirements.txt && python main.py
-```
-
-### Testing
-
-> Update this section once a test framework is set up.
-
-```bash
-# Placeholder — add actual commands here
-# e.g., npm test
-# e.g., pytest
-```
-
-### Linting / Formatting
-
-> Update this section once tooling is configured.
-
-```bash
-# Placeholder — add actual commands here
-# e.g., npm run lint
-# e.g., ruff check . && black .
+feat(items): add pagination to list endpoint
+fix(frontend): handle 404 gracefully in App
+docs: update CLAUDE.md with docker instructions
 ```
 
 ## AI Assistant Guidelines
 
-### What to Do
+### Do
 
-- Read existing files before editing them.
-- Keep changes minimal and focused — only modify what is necessary.
-- Prefer editing existing files over creating new ones.
-- Write clear, descriptive commit messages explaining *why*, not just *what*.
-- Always push to the branch specified in the task context (starts with `claude/`).
-- Ask for clarification when requirements are ambiguous before writing code.
+- Read a file before editing it.
+- Keep changes minimal and focused on what was asked.
+- Add new routers under `backend/routers/` and register them in `main.py`.
+- Add new React components under `frontend/src/components/`.
+- Update this file when making significant architectural decisions.
+- Push to the `claude/<session-id>` branch specified in the task.
 
-### What to Avoid
+### Do Not
 
-- Do not push to `main` or `master` without explicit user permission.
-- Do not delete files or branches without confirming with the user.
-- Do not add unnecessary dependencies, abstractions, or boilerplate.
-- Do not introduce security vulnerabilities (SQL injection, XSS, command injection, etc.).
-- Do not over-engineer: build the simplest thing that satisfies the requirement.
-- Do not add comments, docstrings, or type annotations to code you didn't change.
-
-### Security
-
-- Never commit secrets, API keys, tokens, or credentials.
-- Use `.env` files for local secrets and ensure `.gitignore` covers them.
-- Validate all external input at system boundaries.
-- Prefer well-maintained libraries over custom implementations for auth/crypto.
-
-## File Structure (Template)
-
-Once a technology stack is chosen, update this section with the actual layout:
-
-```
-/
-├── CLAUDE.md           # This file — AI assistant guidance
-├── README.md           # Human-facing project documentation
-├── .gitignore
-├── src/                # Application source code
-├── tests/              # Test files
-├── docs/               # Additional documentation
-└── <config files>      # e.g., package.json, pyproject.toml, go.mod
-```
-
-## Updating This File
-
-Whenever significant project decisions are made (new framework, new conventions, new tooling), update this file to reflect the current state. Keep it accurate and concise — it is the primary reference for AI assistants working in this codebase.
+- Push to `main` without explicit permission.
+- Commit `.env` files or secrets.
+- Add unnecessary abstractions, helpers, or future-proofing.
+- Skip writing tests for new backend routes.
+- Use class components on the frontend.
