@@ -168,7 +168,18 @@ export default function MotorPage() {
                 <Stat label="Isp" value={`${s.specific_impulse.toFixed(0)} s`} />
                 <Stat label="Peak pressure" value={`${(s.peak_pressure / 1e6).toFixed(2)} MPa`} />
                 <Stat label="Prop mass" value={`${s.propellant_mass_initial.toFixed(2)} kg`} />
+                <Stat label="Kn (max)" value={s.kn_max.toFixed(0)} />
+                <Stat label="Port/throat" value={s.port_to_throat.toFixed(1)} />
+                <Stat label="Web" value={`${(s.web_thickness * 1000).toFixed(1)} mm`} />
               </div>
+
+              {s.warnings.length > 0 && (
+                <ul className="warnings">
+                  {s.warnings.map((w) => (
+                    <li key={w}>⚠ {w}</li>
+                  ))}
+                </ul>
+              )}
 
               <LineChart
                 xlabel="Time (s)"

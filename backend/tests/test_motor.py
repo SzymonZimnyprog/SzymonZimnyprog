@@ -91,6 +91,26 @@ def test_no_negative_thrust_when_over_expanded():
     assert res.total_impulse >= 0.0
 
 
+def test_motor_reports_design_diagnostics():
+    prop = PRESETS["KNSB"]
+    grain = Grain(GrainType.BATES, outer_diameter=0.075, core_diameter=0.025,
+                  segment_length=0.12, segments=4, density=prop.density)
+    res = simulate_motor(prop, grain, Nozzle(0.018, 6.0), dt=0.002)
+    assert res.kn_initial > 0
+    assert res.kn_max >= res.kn_initial
+    assert res.port_to_throat > 0
+    assert res.web_thickness > 0
+    assert isinstance(res.warnings, list)
+
+
+def test_narrow_core_warns_low_port_to_throat():
+    prop = PRESETS["KNSB"]
+    grain = Grain(GrainType.BATES, outer_diameter=0.075, core_diameter=0.012,
+                  segment_length=0.12, segments=4, density=prop.density)
+    res = simulate_motor(prop, grain, Nozzle(0.020, 6.0), dt=0.002)
+    assert any("port/throat" in w for w in res.warnings)
+
+
 def test_smaller_throat_raises_pressure():
     base = {"nozzle": {"throat_diameter": 0.018, "expansion_ratio": 6.0,
                        "efficiency": 0.97}}

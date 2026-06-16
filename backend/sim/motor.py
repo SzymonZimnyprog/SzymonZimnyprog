@@ -23,7 +23,7 @@ import math
 from dataclasses import dataclass, field
 
 from .atmosphere import G0, atmosphere
-from .grain import Grain
+from .grain import Grain, GrainType
 from .propellant import Propellant
 
 
@@ -112,6 +112,11 @@ class MotorResult:
     peak_pressure: float = 0.0        # Pa
     propellant_mass_initial: float = 0.0  # kg
     impulse_class: str = ""           # e.g. "H", "I"
+    kn_initial: float = 0.0           # Ab/At at ignition
+    kn_max: float = 0.0               # peak Ab/At
+    port_to_throat: float = 0.0       # initial port area / throat area
+    web_thickness: float = 0.0        # m
+    warnings: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict:
         return {
@@ -131,6 +136,11 @@ class MotorResult:
                 "peak_pressure": self.peak_pressure,
                 "propellant_mass_initial": self.propellant_mass_initial,
                 "impulse_class": self.impulse_class,
+                "kn_initial": self.kn_initial,
+                "kn_max": self.kn_max,
+                "port_to_throat": self.port_to_throat,
+                "web_thickness": self.web_thickness,
+                "warnings": self.warnings,
             },
         }
 
@@ -220,7 +230,37 @@ def simulate_motor(
     if res.burn_time > 0.0:
         res.average_thrust = impulse / res.burn_time
     res.impulse_class = _impulse_class(impulse)
+
+    # Design diagnostics.
+    res.web_thickness = grain.web_thickness
+    res.kn_initial = grain.burn_area(0.0) / at
+    res.kn_max = max(res.kn) if res.kn else 0.0
+    res.port_to_throat = grain.port_area(0.0) / at
+    res.warnings = _design_warnings(res, grain)
     return res
+
+
+def _design_warnings(res: MotorResult, grain: Grain) -> list[str]:
+    warnings: list[str] = []
+    if res.total_impulse <= 0.0:
+        warnings.append(
+            "Motor does not pressurise — raise Kn (smaller throat or more "
+            "burning area)."
+        )
+    if res.peak_pressure > 10.0e6:
+        warnings.append(
+            f"High chamber pressure ({res.peak_pressure / 1e6:.1f} MPa) — "
+            "verify casing strength."
+        )
+    cored = grain.grain_type in (GrainType.BATES, GrainType.TUBULAR)
+    if cored and grain.core_radius > 0 and 0.0 < res.port_to_throat < 2.0:
+        warnings.append(
+            f"Low port/throat ratio ({res.port_to_throat:.1f} < 2) — erosive "
+            "burning risk; widen the core."
+        )
+    if grain.core_radius >= grain.outer_radius and cored:
+        warnings.append("Core diameter >= outer diameter — invalid grain.")
+    return warnings
 
 
 @dataclass(frozen=True)

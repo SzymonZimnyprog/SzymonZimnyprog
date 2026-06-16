@@ -173,6 +173,23 @@ h4 {
   color: #155e75;
 }
 
+.warnings {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.warnings li {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  border-radius: 6px;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.85rem;
+}
+
 .field select {
   padding: 0.4rem 0.5rem;
   border: 1px solid #d1d5db;

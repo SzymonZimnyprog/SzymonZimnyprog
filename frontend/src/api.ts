@@ -139,6 +139,11 @@ export interface MotorResult {
     peak_pressure: number;
     propellant_mass_initial: number;
     impulse_class: string;
+    kn_initial: number;
+    kn_max: number;
+    port_to_throat: number;
+    web_thickness: number;
+    warnings: string[];
   };
 }
 
