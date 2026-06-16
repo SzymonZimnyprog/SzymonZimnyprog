@@ -40,3 +40,24 @@ def test_steeper_launch_reaches_higher():
     high = client.post("/api/missile/simulate", json=base).json()
     low = client.post("/api/missile/simulate", json=flat).json()
     assert high["summary"]["apogee"] > low["summary"]["apogee"]
+
+
+def test_multistage_flight_stages_and_drops_mass():
+    payload = {
+        "stages": [
+            {"motor": {}, "structural_mass": 8.0, "ignition_delay": 0.0},
+            {"motor": {}, "structural_mass": 4.0, "ignition_delay": 1.0},
+        ],
+        "payload": {"diameter": 0.16, "cd0": 0.3, "dry_mass": 15.0},
+        "elevation_deg": 85.0,
+    }
+    data = client.post("/api/missile/multistage", json=payload).json()
+    assert data["summary"]["apogee"] > 0
+    assert len(data["stage_starts"]) == 2
+    # second stage ignites after the first burnout + coast
+    assert data["stage_starts"][1] > data["stage_starts"][0]
+    # the spent first stage is jettisoned (last stage kept by default)
+    assert len(data["separations"]) == 1
+    sep = data["separations"][0]
+    assert sep["mass_after"] < data["initial_mass"]
+

@@ -69,6 +69,14 @@ sustainer): stage *i* ignites after stage *i−1* burns out plus its coast
 `ignition_delay`. Returns the combined (downsampled) thrust curve, per-stage
 timing/impulse, and the stack totals. In the web app: the **Multi-stage** tab.
 
+### Staged flight (`POST /api/missile/multistage`)
+
+Flies the staged stack with the flight integrator, jettisoning each spent
+stage's `structural_mass` at its burnout (the last stage is kept unless
+`drop_last_stage`). Returns the trajectory plus the separation events
+(time / altitude / mass after jettison) — showing the apogee/velocity gain that
+staging buys over a single grain of the same propellant.
+
 ### Design sweep (`POST /api/motor/sweep`)
 
 Re-runs the motor across a list of values for one parameter

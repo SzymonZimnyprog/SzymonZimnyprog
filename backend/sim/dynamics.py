@@ -175,6 +175,62 @@ def propagate(
     return res
 
 
+def propagate_staged(
+    vehicle: Vehicle,
+    launch_position: np.ndarray,
+    launch_velocity: np.ndarray,
+    initial_mass: float,
+    separation_events: list[tuple[float, float]],
+    dt: float = 0.02,
+    max_time: float = 300.0,
+    sample_every: int = 5,
+) -> tuple[TrajectoryResult, list[dict]]:
+    """Un-guided staged flight: drop spent-stage mass at separation events.
+
+    ``vehicle.thrust_curve`` should be a StagedThrust. ``separation_events`` is a
+    list of ``(time, mass_to_drop)`` applied to the vehicle mass as each spent
+    stage is jettisoned. Returns the trajectory and the recorded events.
+    """
+    state = np.empty(7)
+    state[0:3] = launch_position
+    state[3:6] = launch_velocity
+    state[6] = initial_mass
+    launch_dir = (
+        _unit(launch_velocity)
+        if np.linalg.norm(launch_velocity) > 0
+        else np.array([0.0, 0.0, 1.0])
+    )
+
+    res = TrajectoryResult()
+    pending = sorted(separation_events, key=lambda e: e[0])
+    events: list[dict] = []
+    t = 0.0
+    step = 0
+    origin = launch_position.copy()
+    no_lateral = np.zeros(3)
+
+    while t <= max_time:
+        if step % sample_every == 0:
+            _record(res, state, t, origin)
+        if state[2] < 0.0 and state[5] < 0.0 and t > 0.0:
+            break
+        state = rk4_step(state, t, dt, vehicle, no_lateral, launch_dir)
+        t += dt
+        step += 1
+        # Apply any separations crossed during this step.
+        while pending and t >= pending[0][0]:
+            sep_t, mass_drop = pending.pop(0)
+            state[6] = max(state[6] - mass_drop, 0.1)
+            events.append({
+                "time": sep_t,
+                "altitude": float(state[2]),
+                "mass_after": float(state[6]),
+            })
+
+    _finalise(res, t)
+    return res, events
+
+
 def _record(res: TrajectoryResult, state: np.ndarray, t: float, origin: np.ndarray):
     pos = state[0:3]
     vel = state[3:6]

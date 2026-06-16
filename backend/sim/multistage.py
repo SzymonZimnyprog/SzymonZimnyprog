@@ -16,7 +16,55 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .motor import MotorResult, _impulse_class
+from .motor import MotorResult, ThrustCurve, _impulse_class, thrust_curve_from_result
+
+
+@dataclass
+class StagedThrust:
+    """Sequential per-stage thrust, duck-typed like motor.ThrustCurve.
+
+    Exposes ``thrust_at`` / ``mass_flow_at`` so it can drive the flight
+    integrator directly: at time ``t`` it returns the value of whichever stage
+    is currently burning (zero during coast or after all stages burn out).
+    """
+
+    starts: list[float]
+    burnouts: list[float]
+    curves: list[ThrustCurve]
+    propellant_mass_initial: float = 0.0
+
+    def _active(self, t: float) -> int:
+        for i, (s, b) in enumerate(zip(self.starts, self.burnouts)):
+            if s <= t <= b:
+                return i
+        return -1
+
+    def thrust_at(self, t: float) -> float:
+        i = self._active(t)
+        return self.curves[i].thrust_at(t - self.starts[i]) if i >= 0 else 0.0
+
+    def mass_flow_at(self, t: float) -> float:
+        i = self._active(t)
+        return self.curves[i].mass_flow_at(t - self.starts[i]) if i >= 0 else 0.0
+
+
+def staged_thrust(
+    results: list[MotorResult], ignition_delays: list[float]
+) -> tuple[StagedThrust, list[float]]:
+    """Build a StagedThrust and the absolute stage-start times."""
+    starts: list[float] = []
+    burnouts: list[float] = []
+    curves: list[ThrustCurve] = []
+    clock = 0.0
+    for i, res in enumerate(results):
+        delay = ignition_delays[i] if i < len(ignition_delays) else 0.0
+        start = clock + (delay if i > 0 else 0.0)
+        starts.append(start)
+        burnouts.append(start + res.burn_time)
+        curves.append(thrust_curve_from_result(res))
+        clock = start + res.burn_time
+    total_prop = sum(r.propellant_mass_initial for r in results)
+    return StagedThrust(starts, burnouts, curves, total_prop), starts
 
 
 @dataclass
