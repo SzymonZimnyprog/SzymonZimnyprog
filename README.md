@@ -28,6 +28,20 @@ make test             # backend pytest + frontend vitest
 make lint             # ruff + eslint
 ```
 
+### Windows (PowerShell, no `make`)
+
+```powershell
+.\setup.ps1           # create .venv + install backend & frontend deps
+.\dev-backend.ps1     # terminal A — FastAPI at http://localhost:8000
+.\dev-frontend.ps1    # terminal B — Vite UI  at http://localhost:5173
+```
+
+Run the scripts from the repository root. Prerequisites: Python 3.11+ (use
+`py -3` if `python` is not on PATH) and Node 18+. If scripts are blocked, allow
+them for the session with
+`Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`, or run the
+commands inside them directly.
+
 ## Web app
 
 Four tabs:
