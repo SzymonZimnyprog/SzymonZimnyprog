@@ -52,6 +52,45 @@ export const defaultMissile: MissileRequest = {
   max_time: 300,
 };
 
+export const defaultStack = [
+  {
+    motor: {
+      propellant: { ...APCP },
+      grain: {
+        grain_type: "TUBULAR" as const,
+        outer_diameter: 0.14,
+        core_diameter: 0.05,
+        segment_length: 0.3,
+        segments: 3,
+        inhibited_ends: false,
+      },
+      nozzle: { throat_diameter: 0.03, expansion_ratio: 8, efficiency: 0.97 },
+      altitude: 0,
+      dt: 0.001,
+      max_time: 60,
+    },
+    ignition_delay: 0,
+  },
+  {
+    motor: {
+      propellant: { ...APCP },
+      grain: {
+        grain_type: "BATES" as const,
+        outer_diameter: 0.12,
+        core_diameter: 0.06,
+        segment_length: 0.4,
+        segments: 2,
+        inhibited_ends: false,
+      },
+      nozzle: { throat_diameter: 0.018, expansion_ratio: 10, efficiency: 0.97 },
+      altitude: 0,
+      dt: 0.001,
+      max_time: 60,
+    },
+    ignition_delay: 1.5,
+  },
+];
+
 export const defaultEngagement: EngagementRequest = {
   interceptor: {
     motor: {

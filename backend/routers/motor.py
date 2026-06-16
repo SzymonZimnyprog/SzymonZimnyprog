@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from backend.sim.models import MotorRequest, PropellantModel
 from backend.sim.motor import simulate_motor
+from backend.sim.multistage import combine_stages
 from backend.sim.propellant import PRESETS
 
 router = APIRouter()
@@ -41,6 +42,16 @@ class MotorSweepRequest(BaseModel):
     values: list[float] = Field(..., min_length=1, max_length=60)
 
 
+class Stage(BaseModel):
+    motor: MotorRequest = MotorRequest()
+    ignition_delay: float = Field(0.0, ge=0.0, le=60.0,
+                                  description="coast after previous burnout, s")
+
+
+class MultiStageRequest(BaseModel):
+    stages: list[Stage] = Field(..., min_length=1, max_length=5)
+
+
 @router.get("/presets")
 def list_propellant_presets():
     """Available propellant presets and their parameters."""
@@ -66,6 +77,23 @@ def _run_summary(req: MotorRequest) -> dict:
     nozzle = req.nozzle.to_nozzle()
     res = simulate_motor(prop, grain, nozzle, req.altitude, req.dt, req.max_time)
     return res.as_dict()["summary"]
+
+
+@router.post("/multistage")
+def multistage(req: MultiStageRequest):
+    """Build the combined thrust profile of a sequential multi-stage stack."""
+    results = []
+    delays = []
+    for stage in req.stages:
+        m = stage.motor
+        prop = m.propellant.to_propellant()
+        grain = m.grain.to_grain(prop.density)
+        nozzle = m.nozzle.to_nozzle()
+        results.append(
+            simulate_motor(prop, grain, nozzle, m.altitude, m.dt, m.max_time)
+        )
+        delays.append(stage.ignition_delay)
+    return combine_stages(results, delays).as_dict()
 
 
 @router.post("/sweep")

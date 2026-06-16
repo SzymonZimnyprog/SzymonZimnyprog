@@ -62,6 +62,13 @@ Grain types (all with exact regression geometry):
 A **Summerfield separation** clamp prevents the unphysical negative thrust a
 lumped model would otherwise predict for a grossly over-expanded nozzle.
 
+### Multi-stage stack (`POST /api/motor/multistage`)
+
+Builds the combined thrust profile of a sequential stage stack (e.g. a boosted
+sustainer): stage *i* ignites after stage *i−1* burns out plus its coast
+`ignition_delay`. Returns the combined (downsampled) thrust curve, per-stage
+timing/impulse, and the stack totals. In the web app: the **Multi-stage** tab.
+
 ### Design sweep (`POST /api/motor/sweep`)
 
 Re-runs the motor across a list of values for one parameter

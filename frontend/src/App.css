@@ -243,6 +243,30 @@ h4 {
   font-weight: 600;
 }
 
+.stage-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.75rem;
+  background: #fafafa;
+}
+
+.stage-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.4rem;
+}
+
+.preset-row button.danger {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.preset-row button.danger:hover {
+  background: #fecaca;
+}
+
 .field select {
   padding: 0.4rem 0.5rem;
   border: 1px solid #d1d5db;

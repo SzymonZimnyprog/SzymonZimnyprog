@@ -48,10 +48,13 @@ Four tabs:
 | --- | --- |
 | `POST /api/motor/simulate` | thrust curve + summary |
 | `POST /api/motor/sweep` | re-run across one parameter |
+| `POST /api/motor/multistage` | combined thrust of a stage stack |
 | `GET  /api/motor/presets` | propellant presets |
 | `POST /api/missile/simulate` | un-guided trajectory |
 | `POST /api/engagement/simulate` | PN interception run |
 | `POST /api/engagement/solve` | fire-control firing solution |
+| `POST /api/engagement/salvo` | layered salvo, Pk = hits/count |
+| `POST /api/engagement/montecarlo` | Pk under track uncertainty |
 | `POST /api/export/cad/*.{stl,scad}` | CAD geometry |
 | `POST /api/export/simulink/*` | CSV, RASP `.eng`, MATLAB driver |
 

@@ -2,14 +2,16 @@ import { useState } from "react";
 import EngagementPage from "./pages/EngagementPage";
 import MissilePage from "./pages/MissilePage";
 import MotorPage from "./pages/MotorPage";
+import StackPage from "./pages/StackPage";
 import ItemsPage from "./pages/ItemsPage";
 import "./App.css";
 
-type Tab = "engagement" | "motor" | "missile" | "items";
+type Tab = "engagement" | "motor" | "stack" | "missile" | "items";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "engagement", label: "Interception" },
   { id: "motor", label: "Motor" },
+  { id: "stack", label: "Multi-stage" },
   { id: "missile", label: "Trajectory" },
   { id: "items", label: "Items" },
 ];
@@ -40,6 +42,7 @@ export default function App() {
 
       {tab === "engagement" && <EngagementPage />}
       {tab === "motor" && <MotorPage />}
+      {tab === "stack" && <StackPage />}
       {tab === "missile" && <MissilePage />}
       {tab === "items" && <ItemsPage />}
     </main>

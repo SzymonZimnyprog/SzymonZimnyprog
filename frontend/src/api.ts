@@ -292,6 +292,38 @@ export interface MotorSweepRequest {
 export const sweepMotor = (req: MotorSweepRequest) =>
   postJson<MotorSweepResult>("/motor/sweep", req);
 
+export interface Stage {
+  motor: MotorRequest;
+  ignition_delay: number;
+}
+
+export interface StageResult {
+  index: number;
+  start_time: number;
+  burn_time: number;
+  total_impulse: number;
+  propellant_mass: number;
+  impulse_class: string;
+}
+
+export interface StackResult {
+  time: number[];
+  thrust: number[];
+  stage_starts: number[];
+  stages: StageResult[];
+  summary: {
+    total_impulse: number;
+    burn_time: number;
+    propellant_mass_total: number;
+    peak_thrust: number;
+    impulse_class: string;
+    stage_count: number;
+  };
+}
+
+export const simulateMultiStage = (stages: Stage[]) =>
+  postJson<StackResult>("/motor/multistage", { stages });
+
 export async function fetchPropellantPresets(): Promise<
   Record<string, Propellant>
 > {

@@ -111,6 +111,34 @@ def test_narrow_core_warns_low_port_to_throat():
     assert any("port/throat" in w for w in res.warnings)
 
 
+def test_multistage_stack_combines_impulse_and_timing():
+    resp = client.post("/api/motor/multistage", json={
+        "stages": [
+            {"motor": {}, "ignition_delay": 0.0},
+            {"motor": {}, "ignition_delay": 2.0},
+        ],
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["summary"]["stage_count"] == 2
+    assert len(data["stages"]) == 2
+    # second stage ignites after the first burns out + the coast delay
+    s0, s1 = data["stages"]
+    assert s1["start_time"] >= s0["start_time"] + s0["burn_time"] + 2.0 - 1e-6
+    # combined impulse is the sum of the stages
+    total = s0["total_impulse"] + s1["total_impulse"]
+    assert abs(data["summary"]["total_impulse"] - total) < 1.0
+    # combined curve is downsampled for transport
+    assert len(data["time"]) <= 2001
+    assert len(data["time"]) == len(data["thrust"])
+
+
+def test_multistage_single_stage_starts_at_zero():
+    data = client.post("/api/motor/multistage", json={"stages": [{"motor": {}}]}).json()
+    assert data["stage_starts"][0] == 0.0
+    assert data["summary"]["stage_count"] == 1
+
+
 def test_smaller_throat_raises_pressure():
     base = {"nozzle": {"throat_diameter": 0.018, "expansion_ratio": 6.0,
                        "efficiency": 0.97}}
