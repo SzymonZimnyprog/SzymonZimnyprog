@@ -50,8 +50,26 @@ correction; the nozzle exit Mach number is solved from the area-ratio relation.
 Outputs: thrust / pressure / mass-flow / Kn vs time, total impulse, NAR/Tripoli
 impulse class, specific impulse, peak thrust and pressure.
 
-Grain types: **BATES** (cylindrical, central bore, optional end-burning) and
-**END_BURNER**.
+Grain types (all with exact regression geometry):
+
+| Type | Burning surfaces | Thrust character |
+| --- | --- | --- |
+| `BATES` | central bore + end faces | mildly progressive→neutral |
+| `TUBULAR` | inner + outer + ends | progressive, short/high-Pc |
+| `ROD` | outer surface + ends | regressive |
+| `END_BURNER` | one face only | long, low, near-constant |
+
+A **Summerfield separation** clamp prevents the unphysical negative thrust a
+lumped model would otherwise predict for a grossly over-expanded nozzle.
+
+### Design sweep (`POST /api/motor/sweep`)
+
+Re-runs the motor across a list of values for one parameter
+(`nozzle.throat_diameter`, `nozzle.expansion_ratio`, `grain.core_diameter`,
+`grain.outer_diameter`, `grain.segment_length`, `grain.segments`,
+`propellant.n`, `altitude`) and returns the summary metrics for each — e.g. the
+classic peak-pressure-vs-throat-area trade. Exposed in the web app as the
+**Design sweep** panel on the Motor tab.
 
 ### Missile trajectory (`/api/missile/simulate`)
 
@@ -73,6 +91,17 @@ a_cmd  = N · V_c · (Ω × R̂)        # perpendicular to LOS, |a| ≤ g_max
 The target flies a ballistic arc (gravity + drag) with an optional constant
 manoeuvre acceleration. The run stops at closest approach; if that distance is
 inside `lethal_radius` the engagement is reported as an intercept.
+
+### Fire-control solver (`POST /api/engagement/solve`)
+
+Closes the loop into an interception *system*: given the target state, it
+computes the launch **azimuth** (from the target bearing) and searches the
+launch **elevation** that minimises miss distance. The motor thrust curve is
+built once and reused — only the launch direction is varied per evaluation
+(coarse elevation scan → golden-section refinement → small azimuth refinement).
+Returns the firing solution, the launch **envelope** (miss vs elevation) and
+the full engagement at the solution for plotting. In the web app this is the
+**Auto-aim** button on the Interception tab.
 
 ## CAD workflow
 

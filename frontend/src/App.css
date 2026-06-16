@@ -145,6 +145,43 @@ h4 {
   cursor: default;
 }
 
+.run.secondary {
+  background: #0d9488;
+}
+
+.run.secondary:hover {
+  background: #0f766e;
+}
+
+.run.secondary:disabled {
+  background: #99f6e4;
+}
+
+.solution {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  background: #ecfeff;
+  border: 1px solid #a5f3fc;
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.solution span {
+  font-size: 0.85rem;
+  color: #155e75;
+}
+
+.field select {
+  padding: 0.4rem 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  width: 100%;
+  background: #fff;
+}
+
 /* ---- results ---- */
 .stats {
   display: grid;

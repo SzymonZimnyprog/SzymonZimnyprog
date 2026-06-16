@@ -21,8 +21,10 @@ from enum import Enum
 
 
 class GrainType(str, Enum):
-    BATES = "BATES"
-    END_BURNER = "END_BURNER"
+    BATES = "BATES"          # cylindrical, central bore (burns out + ends)
+    END_BURNER = "END_BURNER"  # solid cylinder, one face only
+    TUBULAR = "TUBULAR"      # hollow tube, inner + outer + ends burning
+    ROD = "ROD"              # solid rod, outer surface + ends (regressive)
 
 
 @dataclass(frozen=True)
@@ -49,12 +51,16 @@ class Grain:
         """Maximum web distance before burnout."""
         if self.grain_type == GrainType.END_BURNER:
             return self.segment_length
-        radial = self.outer_radius - self.core_radius
+        if self.grain_type == GrainType.TUBULAR:
+            radial = (self.outer_radius - self.core_radius) / 2.0
+        elif self.grain_type == GrainType.ROD:
+            radial = self.outer_radius
+        else:  # BATES
+            radial = self.outer_radius - self.core_radius
         if self.inhibited_ends:
             return radial
-        # ends also limit life: each segment burns from both faces.
-        axial = self.segment_length / 2.0
-        return min(radial, axial)
+        # ends also limit life: each uninhibited segment burns from both faces.
+        return min(radial, self.segment_length / 2.0)
 
     # ---- geometry as a function of regression ------------------------------
     def burn_area(self, web: float) -> float:
@@ -63,28 +69,54 @@ class Grain:
         if self.grain_type == GrainType.END_BURNER:
             return math.pi * self.outer_radius ** 2
 
+        length = self.segment_length if self.inhibited_ends else (
+            self.segment_length - 2.0 * w
+        )
+        if length <= 0.0:
+            return 0.0
+
+        if self.grain_type == GrainType.ROD:
+            r = self.outer_radius - w
+            if r <= 0.0:
+                return 0.0
+            lateral = 2.0 * math.pi * r * length
+            ends = 0.0 if self.inhibited_ends else 2.0 * math.pi * r ** 2
+            return self.segments * (lateral + ends)
+
+        if self.grain_type == GrainType.TUBULAR:
+            r_in = self.core_radius + w
+            r_out = self.outer_radius - w
+            if r_in >= r_out:
+                return 0.0
+            lateral = 2.0 * math.pi * (r_in + r_out) * length
+            ends = 0.0 if self.inhibited_ends else (
+                2.0 * math.pi * (r_out ** 2 - r_in ** 2)
+            )
+            return self.segments * (lateral + ends)
+
+        # BATES
         r_core = self.core_radius + w
         r_out = self.outer_radius
         if r_core >= r_out:
             return 0.0
-
-        if self.inhibited_ends:
-            length = self.segment_length
-            core_lateral = 2.0 * math.pi * r_core * length
-            return self.segments * core_lateral
-
-        length = self.segment_length - 2.0 * w
-        if length <= 0.0:
-            return 0.0
         core_lateral = 2.0 * math.pi * r_core * length
-        end_faces = 2.0 * math.pi * (r_out ** 2 - r_core ** 2)
-        return self.segments * (core_lateral + end_faces)
+        ends = 0.0 if self.inhibited_ends else (
+            2.0 * math.pi * (r_out ** 2 - r_core ** 2)
+        )
+        return self.segments * (core_lateral + ends)
 
     def port_area(self, web: float) -> float:
         """Cross-sectional flow (port) area through the bore [m^2]."""
+        w = max(0.0, min(web, self.web_thickness))
         if self.grain_type == GrainType.END_BURNER:
             return math.pi * self.outer_radius ** 2
-        w = max(0.0, min(web, self.web_thickness))
+        if self.grain_type == GrainType.ROD:
+            # flow passes around the rod, inside the casing
+            r = max(self.outer_radius - w, 0.0)
+            return math.pi * (self.outer_radius ** 2 - r ** 2)
+        if self.grain_type == GrainType.TUBULAR:
+            r_in = min(self.core_radius + w, self.outer_radius)
+            return math.pi * r_in ** 2
         r_core = min(self.core_radius + w, self.outer_radius)
         return math.pi * r_core ** 2
 
@@ -95,11 +127,18 @@ class Grain:
             length = max(self.segment_length - w, 0.0)
             return math.pi * self.outer_radius ** 2 * length
 
+        length = self.segment_length if self.inhibited_ends else max(
+            self.segment_length - 2.0 * w, 0.0
+        )
+        if self.grain_type == GrainType.ROD:
+            r = max(self.outer_radius - w, 0.0)
+            return self.segments * math.pi * r ** 2 * length
+        if self.grain_type == GrainType.TUBULAR:
+            r_in = self.core_radius + w
+            r_out = max(self.outer_radius - w, r_in)
+            ring = math.pi * (r_out ** 2 - r_in ** 2)
+            return self.segments * ring * length
         r_core = min(self.core_radius + w, self.outer_radius)
-        if self.inhibited_ends:
-            length = self.segment_length
-        else:
-            length = max(self.segment_length - 2.0 * w, 0.0)
         ring = math.pi * (self.outer_radius ** 2 - r_core ** 2)
         return self.segments * ring * length
 

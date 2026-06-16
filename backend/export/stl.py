@@ -70,7 +70,8 @@ def revolve_solid(
 def grain_stl(grain: Grain, segments: int = 96) -> str:
     """STL of a single grain segment (hollow cylinder for BATES)."""
     ro = grain.outer_radius
-    ri = grain.core_radius if grain.grain_type == GrainType.BATES else 0.0
+    hollow = grain.grain_type in (GrainType.BATES, GrainType.TUBULAR)
+    ri = grain.core_radius if hollow else 0.0
     h = grain.segment_length
     if ri <= 0.0:
         profile = [(0.0, 0.0), (ro, 0.0), (ro, h), (0.0, h)]

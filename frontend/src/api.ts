@@ -47,8 +47,10 @@ export interface Propellant {
   c_star_eff: number;
 }
 
+export type GrainType = "BATES" | "END_BURNER" | "TUBULAR" | "ROD";
+
 export interface Grain {
-  grain_type: "BATES" | "END_BURNER";
+  grain_type: GrainType;
   outer_diameter: number;
   core_diameter: number;
   segment_length: number;
@@ -200,6 +202,35 @@ export const simulateMissile = (req: MissileRequest) =>
 
 export const simulateEngagement = (req: EngagementRequest) =>
   postJson<EngagementResult>("/engagement/simulate", req);
+
+export interface FireSolution {
+  intercepted: boolean;
+  elevation_deg: number;
+  azimuth_deg: number;
+  miss_distance: number;
+  intercept_time: number;
+  intercept_point: number[];
+  envelope: { elevation: number; miss: number; hit: boolean }[];
+  engagement: EngagementResult;
+  interceptor_motor_summary: MotorResult["summary"];
+}
+
+export const solveEngagement = (req: EngagementRequest) =>
+  postJson<FireSolution>("/engagement/solve", req);
+
+export interface MotorSweepResult {
+  parameter: string;
+  points: { value: number; summary: MotorResult["summary"] }[];
+}
+
+export interface MotorSweepRequest {
+  base: MotorRequest;
+  parameter: string;
+  values: number[];
+}
+
+export const sweepMotor = (req: MotorSweepRequest) =>
+  postJson<MotorSweepResult>("/motor/sweep", req);
 
 export async function fetchPropellantPresets(): Promise<
   Record<string, Propellant>

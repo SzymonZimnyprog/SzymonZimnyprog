@@ -2,8 +2,10 @@ import { useState } from "react";
 import {
   downloadExport,
   simulateEngagement,
+  solveEngagement,
   type EngagementRequest,
   type EngagementResult,
+  type FireSolution,
 } from "../api";
 import { defaultEngagement } from "../defaults";
 import LineChart from "../components/LineChart";
@@ -15,6 +17,7 @@ export default function EngagementPage() {
     structuredClone(defaultEngagement)
   );
   const [result, setResult] = useState<EngagementResult | null>(null);
+  const [solution, setSolution] = useState<FireSolution | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,8 +42,27 @@ export default function EngagementPage() {
   async function run() {
     setBusy(true);
     setError(null);
+    setSolution(null);
     try {
       setResult(await simulateEngagement(req));
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function solve() {
+    setBusy(true);
+    setError(null);
+    try {
+      const sol = await solveEngagement(req);
+      setSolution(sol);
+      setResult(sol.engagement);
+      patchInt({
+        elevation_deg: Math.round(sol.elevation_deg * 10) / 10,
+        azimuth_deg: Math.round(sol.azimuth_deg * 10) / 10,
+      });
     } catch (e) {
       setError(String(e));
     } finally {
@@ -118,6 +140,9 @@ export default function EngagementPage() {
           <button className="run" onClick={run} disabled={busy}>
             {busy ? "Simulating…" : "Run engagement"}
           </button>
+          <button className="run secondary" onClick={solve} disabled={busy}>
+            {busy ? "Solving…" : "Auto-aim — compute firing solution"}
+          </button>
           {error && <p className="error">{error}</p>}
         </section>
 
@@ -131,6 +156,16 @@ export default function EngagementPage() {
                   closing {Math.abs(s.closing_speed_at_intercept).toFixed(0)} m/s
                 </span>
               </div>
+
+              {solution && (
+                <div className="solution">
+                  <strong>Firing solution</strong>
+                  <span>
+                    elevation {solution.elevation_deg.toFixed(1)}° · azimuth{" "}
+                    {solution.azimuth_deg.toFixed(1)}° (form fields updated)
+                  </span>
+                </div>
+              )}
 
               <TrajectoryPlot
                 paths={[
@@ -152,6 +187,19 @@ export default function EngagementPage() {
                   { label: "Target", color: "#dc2626", x: result!.time, y: result!.target_speed },
                 ]}
               />
+
+              {solution && solution.envelope.length > 1 && (
+                <LineChart
+                  xlabel="Launch elevation (°)"
+                  ylabel="Miss distance (m)"
+                  series={[{
+                    label: "Miss vs elevation",
+                    color: "#7c3aed",
+                    x: solution.envelope.map((e) => e.elevation),
+                    y: solution.envelope.map((e) => Math.min(e.miss, 5000)),
+                  }]}
+                />
+              )}
 
               <h3>Export</h3>
               <div className="export-row">

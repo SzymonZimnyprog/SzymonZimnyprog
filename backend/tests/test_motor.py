@@ -67,3 +67,40 @@ def test_motor_presets_endpoint():
     resp = client.get("/api/motor/presets")
     assert resp.status_code == 200
     assert "KNSB" in resp.json()
+
+
+def test_all_grain_types_produce_positive_impulse():
+    prop = PRESETS["KNSB"]
+    nozzle = Nozzle(throat_diameter=0.018, expansion_ratio=6.0)
+    for gt in (GrainType.BATES, GrainType.TUBULAR, GrainType.ROD):
+        grain = Grain(gt, outer_diameter=0.075, core_diameter=0.025,
+                      segment_length=0.12, segments=2, density=prop.density)
+        res = simulate_motor(prop, grain, nozzle, dt=0.002)
+        assert res.total_impulse > 0, gt
+        assert res.peak_thrust > 0, gt
+
+
+def test_no_negative_thrust_when_over_expanded():
+    # Oversized throat + large expansion ratio => over-expansion; thrust must
+    # never go negative (Summerfield separation clamp).
+    prop = PRESETS["KNSB"]
+    grain = Grain(GrainType.END_BURNER, outer_diameter=0.075, core_diameter=0.0,
+                  segment_length=0.12, segments=1, density=prop.density)
+    res = simulate_motor(prop, grain, Nozzle(0.018, 6.0), dt=0.002)
+    assert all(t >= 0.0 for t in res.thrust)
+    assert res.total_impulse >= 0.0
+
+
+def test_smaller_throat_raises_pressure():
+    base = {"nozzle": {"throat_diameter": 0.018, "expansion_ratio": 6.0,
+                       "efficiency": 0.97}}
+    resp = client.post("/api/motor/sweep", json={
+        "base": base,
+        "parameter": "nozzle.throat_diameter",
+        "values": [0.014, 0.018, 0.022],
+    })
+    assert resp.status_code == 200
+    pts = resp.json()["points"]
+    pressures = [p["summary"]["peak_pressure"] for p in pts]
+    # peak pressure strictly decreases as the throat opens up
+    assert pressures[0] > pressures[1] > pressures[2]

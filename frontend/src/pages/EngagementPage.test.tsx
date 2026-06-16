@@ -42,4 +42,27 @@ describe("EngagementPage", () => {
     expect(await screen.findByText(/miss 4.0 m/i)).toBeTruthy();
     expect(screen.getByText("✓ INTERCEPT")).toBeTruthy();
   });
+
+  it("shows the firing solution after auto-aim", async () => {
+    vi.mocked(api.solveEngagement).mockResolvedValue({
+      intercepted: true,
+      elevation_deg: 25.2,
+      azimuth_deg: 90,
+      miss_distance: 0.3,
+      intercept_time: 23.6,
+      intercept_point: [10000, 0, 6000],
+      envelope: [
+        { elevation: 10, miss: 4000, hit: false },
+        { elevation: 25, miss: 0.3, hit: true },
+        { elevation: 80, miss: 5000, hit: false },
+      ],
+      engagement: result,
+      interceptor_motor_summary: result.interceptor_motor_summary,
+    } as never);
+    const user = userEvent.setup();
+    render(<EngagementPage />);
+    await user.click(screen.getByRole("button", { name: /Auto-aim/i }));
+    expect(await screen.findByText(/elevation 25.2°/i)).toBeTruthy();
+    expect(screen.getByText("Firing solution")).toBeTruthy();
+  });
 });

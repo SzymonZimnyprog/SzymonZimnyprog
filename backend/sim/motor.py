@@ -81,9 +81,17 @@ def thrust_coefficient(
         * (2.0 / (g + 1.0)) ** ((g + 1.0) / (g - 1.0))
         * (1.0 - pe_ratio ** ((g - 1.0) / g))
     )
-    pressure_term = (pe - ambient_pressure) / chamber_pressure * eps
+
+    # Summerfield separation criterion: a grossly over-expanded nozzle separates
+    # internally rather than producing the full (unphysical) negative pressure
+    # thrust. Once pe drops below ~0.35 * pa the effective exit pressure is held
+    # at the separation value.
+    pe_eff = pe
+    if ambient_pressure > 0.0 and pe < 0.35 * ambient_pressure:
+        pe_eff = 0.35 * ambient_pressure
+    pressure_term = (pe_eff - ambient_pressure) / chamber_pressure * eps
     cf = (momentum + pressure_term) * nozzle.efficiency
-    return cf, pe
+    return max(cf, 0.0), pe
 
 
 @dataclass
