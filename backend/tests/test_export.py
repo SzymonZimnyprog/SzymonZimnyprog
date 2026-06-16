@@ -50,6 +50,14 @@ def test_engagement_csv():
     assert resp.text.startswith("time_s,int_x")
 
 
+def test_trajectory_csv():
+    resp = client.post("/api/export/simulink/trajectory.csv", json={})
+    assert resp.status_code == 200
+    lines = resp.text.strip().splitlines()
+    assert lines[0] == "time_s,x,y,z,speed_mps,mach,mass_kg,altitude_m"
+    assert len(lines) > 2
+
+
 def test_matlab_driver():
     resp = client.get("/api/export/simulink/driver.m")
     assert resp.status_code == 200

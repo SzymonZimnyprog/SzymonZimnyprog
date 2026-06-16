@@ -122,6 +122,9 @@ export default function MissilePage() {
                 <button onClick={() => downloadExport("/export/cad/airframe.scad", airframeReq, "airframe.scad")}>
                   Airframe OpenSCAD
                 </button>
+                <button onClick={() => downloadExport("/export/simulink/trajectory.csv", req, "trajectory.csv")}>
+                  Trajectory CSV
+                </button>
               </div>
             </>
           )}

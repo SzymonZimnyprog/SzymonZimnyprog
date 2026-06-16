@@ -5,16 +5,21 @@ Each endpoint returns a downloadable text artefact with the appropriate
 fetched programmatically by a CAD/MATLAB toolchain.
 """
 
+import numpy as np
 from fastapi import APIRouter, Response
 from pydantic import BaseModel, Field
 
 from backend.export import openscad, simulink
 from backend.export.stl import airframe_stl, grain_stl, nozzle_stl
+from backend.sim.dynamics import propagate
 from backend.sim.engagement import simulate_engagement
 from backend.sim.models import (
     AirframeModel,
     EngagementRequest,
+    MissileRequest,
     MotorRequest,
+    build_vehicle_and_curve,
+    launch_velocity,
 )
 from backend.sim.motor import simulate_motor
 
@@ -116,6 +121,19 @@ def motor_eng_export(req: MotorRequest):
         total_mass=total_mass,
     )
     return _download(content, "motor.eng", "text/plain")
+
+
+@router.post("/simulink/trajectory.csv")
+def trajectory_csv_export(req: MissileRequest):
+    vehicle, curve, _motor = build_vehicle_and_curve(req.motor, req.airframe)
+    vel = launch_velocity(req.launch_speed, req.elevation_deg, req.azimuth_deg)
+    traj = propagate(
+        vehicle, launch_position=np.zeros(3), launch_velocity=vel,
+        propellant_mass=curve.propellant_mass_initial, dt=req.dt,
+        max_time=req.max_time,
+    )
+    return _download(simulink.trajectory_csv(traj.as_dict()),
+                     "trajectory.csv", "text/csv")
 
 
 @router.post("/simulink/engagement.csv")
