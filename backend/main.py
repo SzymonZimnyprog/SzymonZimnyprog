@@ -1,8 +1,9 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from backend.routers import items
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from backend.routers import engagement, export, items, missile, motor
 
 
 @asynccontextmanager
@@ -10,7 +11,16 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="SzymonZimnyprog API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(
+    title="SzymonZimnyprog Interceptor & Motor Simulator API",
+    version="0.2.0",
+    description=(
+        "Parametric solid-rocket-motor internal ballistics, missile flight "
+        "dynamics and proportional-navigation interception simulation, with "
+        "CAD (STL/OpenSCAD) and Simulink/MATLAB export."
+    ),
+    lifespan=lifespan,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -21,6 +31,10 @@ app.add_middleware(
 )
 
 app.include_router(items.router, prefix="/api/items", tags=["items"])
+app.include_router(motor.router, prefix="/api/motor", tags=["motor"])
+app.include_router(missile.router, prefix="/api/missile", tags=["missile"])
+app.include_router(engagement.router, prefix="/api/engagement", tags=["engagement"])
+app.include_router(export.router, prefix="/api/export", tags=["export"])
 
 
 @app.get("/api/health")
