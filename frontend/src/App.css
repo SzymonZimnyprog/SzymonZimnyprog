@@ -135,6 +135,19 @@ h4 {
   background: #c7d2fe;
 }
 
+.filebtn {
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.filebtn:hover {
+  background: #c7d2fe;
+}
+
 .run {
   margin-top: 1rem;
   width: 100%;

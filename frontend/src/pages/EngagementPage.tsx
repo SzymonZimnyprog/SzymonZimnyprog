@@ -10,6 +10,7 @@ import {
 import { defaultEngagement } from "../defaults";
 import LineChart from "../components/LineChart";
 import TrajectoryPlot from "../components/TrajectoryPlot";
+import PathPlot from "../components/PathPlot";
 import NumberField from "../components/NumberField";
 
 export default function EngagementPage() {
@@ -50,6 +51,36 @@ export default function EngagementPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function saveScenario() {
+    const blob = new Blob([JSON.stringify(req, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "engagement_scenario.json";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function loadScenario(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        setReq(JSON.parse(String(reader.result)) as EngagementRequest);
+        setResult(null);
+        setSolution(null);
+        setError(null);
+      } catch {
+        setError("Invalid scenario file.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
   }
 
   async function solve() {
@@ -125,10 +156,14 @@ export default function EngagementPage() {
           <div className="grid">
             <NumberField label="Pos X (E)" unit="m" step={500} value={tg.position[0]}
               onChange={(v) => setTgtVec("position", 0, v)} />
+            <NumberField label="Pos Y (N)" unit="m" step={500} value={tg.position[1]}
+              onChange={(v) => setTgtVec("position", 1, v)} />
             <NumberField label="Pos Z (alt)" unit="m" step={500} value={tg.position[2]}
               onChange={(v) => setTgtVec("position", 2, v)} />
             <NumberField label="Vel X" unit="m/s" step={10} value={tg.velocity[0]}
               onChange={(v) => setTgtVec("velocity", 0, v)} />
+            <NumberField label="Vel Y" unit="m/s" step={10} value={tg.velocity[1]}
+              onChange={(v) => setTgtVec("velocity", 1, v)} />
             <NumberField label="Vel Z" unit="m/s" step={10} value={tg.velocity[2]}
               onChange={(v) => setTgtVec("velocity", 2, v)} />
             <NumberField label="Mass" unit="kg" step={10} value={tg.mass}
@@ -143,6 +178,13 @@ export default function EngagementPage() {
           <button className="run secondary" onClick={solve} disabled={busy}>
             {busy ? "Solving…" : "Auto-aim — compute firing solution"}
           </button>
+          <div className="export-row" style={{ marginTop: "0.6rem" }}>
+            <button onClick={saveScenario}>Save scenario</button>
+            <label className="filebtn">
+              Load scenario
+              <input type="file" accept="application/json" onChange={loadScenario} hidden />
+            </label>
+          </div>
           {error && <p className="error">{error}</p>}
         </section>
 
@@ -173,6 +215,31 @@ export default function EngagementPage() {
                   { label: "Target", color: "#dc2626", ground: tgtGround, alt: tgtAlt },
                 ]}
                 marker={marker}
+              />
+              <PathPlot
+                xlabel="East"
+                ylabel="North"
+                unit="km"
+                scale={1000}
+                paths={[
+                  {
+                    label: "Interceptor",
+                    color: "#6366f1",
+                    x: result!.interceptor_position.map((p) => p[0]),
+                    y: result!.interceptor_position.map((p) => p[1]),
+                  },
+                  {
+                    label: "Target",
+                    color: "#dc2626",
+                    x: result!.target_position.map((p) => p[0]),
+                    y: result!.target_position.map((p) => p[1]),
+                  },
+                ]}
+                marker={
+                  s.intercept_point.length
+                    ? { x: s.intercept_point[0], y: s.intercept_point[1], label: marker?.label ?? "" }
+                    : null
+                }
               />
               <LineChart
                 xlabel="Time (s)"
