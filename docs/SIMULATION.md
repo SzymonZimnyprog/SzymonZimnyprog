@@ -1,0 +1,126 @@
+# Interceptor & Solid-Motor Simulator
+
+A parametric aerospace-engineering simulation suite: solid rocket motor
+internal ballistics, missile flight dynamics, and proportional-navigation
+interception — driveable from the **web app**, exportable to **CAD**
+(STL / OpenSCAD), and to **Simulink / MATLAB** (CSV, RASP `.eng`, REST driver).
+
+> **Scope.** This is a physics/kinematics simulator built on standard,
+> publicly documented engineering models (Sutton, *Rocket Propulsion
+> Elements*; Zarchan, *Tactical and Strategic Missile Guidance*). It models
+> propulsion, atmospheric flight and guidance *control laws*. It contains no
+> warhead, lethality, fuzing or propellant-manufacturing content — intercept
+> is a purely kinematic closest-approach criterion.
+
+## Architecture
+
+```
+backend/sim/        physics core (pure Python + numpy)
+  atmosphere.py     ISA 1976 standard atmosphere
+  propellant.py     propellant thermochemistry + burn-rate law, presets
+  grain.py          parametric grain geometry + surface regression
+  motor.py          internal ballistics -> thrust curve, Isp, total impulse
+  aerodynamics.py   Mach-dependent drag model
+  dynamics.py       3-DOF point-mass flight integrator (RK4)
+  guidance.py       proportional-navigation guidance law
+  engagement.py     interceptor-vs-target engagement
+  models.py         Pydantic request/response schemas + builders
+
+backend/export/     stl.py (mesh), openscad.py (parametric), simulink.py
+backend/routers/    motor, missile, engagement, export
+frontend/src/       React UI (tabs: Interception / Motor / Trajectory / Items)
+```
+
+## Physics models
+
+### Solid rocket motor (`/api/motor/simulate`)
+
+Quasi-steady lumped-parameter internal ballistics:
+
+| Quantity | Relation |
+| --- | --- |
+| Burn rate | `r = a · Pc^n` (Saint-Robert) |
+| Equilibrium chamber pressure | `Pc = (ρ_p · A_b · a · c* / A_t)^(1/(1−n))` |
+| Choked mass flow | `ṁ = Pc · A_t / c*` |
+| Characteristic velocity | `c* = √(R·T0) / Γ(γ) · η_c*` |
+| Thrust | `F = C_f · A_t · Pc` |
+
+`C_f` includes the ideal-expansion momentum term plus an ambient-pressure
+correction; the nozzle exit Mach number is solved from the area-ratio relation.
+Outputs: thrust / pressure / mass-flow / Kn vs time, total impulse, NAR/Tripoli
+impulse class, specific impulse, peak thrust and pressure.
+
+Grain types: **BATES** (cylindrical, central bore, optional end-burning) and
+**END_BURNER**.
+
+### Missile trajectory (`/api/missile/simulate`)
+
+3-DOF point-mass flight in an ENU flat-earth frame, RK4-integrated. Thrust acts
+along the velocity vector (along the launch direction before lift-off), with
+ISA atmosphere, Mach-dependent drag and mass depletion from the motor mass-flow.
+
+### Interception (`/api/engagement/simulate`)
+
+Interceptor and target are propagated together. The interceptor boosts on its
+solid motor, then homes using **true proportional navigation**:
+
+```
+Ω      = (R × V) / (R · R)        # line-of-sight rate
+V_c    = −(R · V) / |R|           # closing speed
+a_cmd  = N · V_c · (Ω × R̂)        # perpendicular to LOS, |a| ≤ g_max
+```
+
+The target flies a ballistic arc (gravity + drag) with an optional constant
+manoeuvre acceleration. The run stops at closest approach; if that distance is
+inside `lethal_radius` the engagement is reported as an intercept.
+
+## CAD workflow
+
+Every motor/airframe parameter set can be exported as geometry:
+
+* **STL** (`/api/export/cad/{grain,nozzle,airframe}.stl`) — watertight meshes by
+  surface-of-revolution; import into any CAD/slicer.
+* **OpenSCAD** (`/api/export/cad/{grain,nozzle,airframe}.scad`) — *parametric*,
+  editable source with every dimension as a named variable at the top of the
+  file. Open in OpenSCAD or import into FreeCAD to keep iterating.
+
+In the web app, run a motor/trajectory simulation and use the **Export**
+buttons. Programmatically:
+
+```bash
+curl -X POST localhost:8000/api/export/cad/nozzle.scad \
+  -H 'Content-Type: application/json' -d @motor.json -o nozzle.scad
+openscad nozzle.scad
+```
+
+## Simulink / MATLAB workflow
+
+Three integration paths:
+
+1. **RASP `.eng`** (`/api/export/simulink/motor.eng`) — the standard motor file
+   read by OpenRocket / ThrustCurve.org and importable into Simulink with
+   `readmatrix`.
+2. **CSV** (`thrust_curve.csv`, `engagement.csv`) — load with
+   `readtimetable` / `readmatrix` and feed `From Workspace` blocks.
+3. **Live REST driver** (`/api/export/simulink/driver.m`) — `szymon_sim_driver.m`
+   calls the running API with `webwrite` and lands the results in the MATLAB
+   workspace as `timeseries` objects:
+
+```matlab
+% start the backend first (make dev-backend)
+out = szymon_sim_driver('motor');              % default motor
+plot(out.thrust_ts);                            % thrust curve
+out = szymon_sim_driver('engagement', req);    % req: scenario struct
+% interceptor_ts / target_ts / separation_ts are now in the base workspace,
+% ready for Simulink "From Workspace" blocks.
+```
+
+## Running
+
+```bash
+make install
+make dev-backend     # http://localhost:8000  (Swagger at /docs)
+make dev-frontend    # http://localhost:5173
+make test            # backend pytest + frontend vitest
+make lint            # ruff + eslint
+```

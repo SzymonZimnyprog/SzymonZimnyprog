@@ -1,7 +1,239 @@
 h1 {
   font-size: 1.75rem;
   font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+h2 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 1rem 0 0.5rem;
+}
+
+h4 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4b5563;
+  margin: 0.75rem 0 0.4rem;
+}
+
+/* ---- header + tabs ---- */
+.app-header {
   margin-bottom: 1.5rem;
+}
+
+.subtitle {
+  color: #6b7280;
+  margin-bottom: 1rem;
+}
+
+.muted {
+  color: #6b7280;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.tab {
+  background: transparent;
+  color: #4b5563;
+  border-radius: 6px 6px 0 0;
+  padding: 0.5rem 1rem;
+}
+
+.tab:hover {
+  background: #eef2ff;
+}
+
+.tab.active {
+  background: #6366f1;
+  color: #fff;
+}
+
+/* ---- two-column layout ---- */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.params,
+.results {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.field-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.field input {
+  padding: 0.4rem 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  width: 100%;
+}
+
+.field input:focus {
+  outline: 2px solid #6366f1;
+  border-color: transparent;
+}
+
+.preset-row,
+.export-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.export-row button,
+.preset-row button {
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.7rem;
+}
+
+.export-row button:hover,
+.preset-row button:hover {
+  background: #c7d2fe;
+}
+
+.run {
+  margin-top: 1rem;
+  width: 100%;
+}
+
+.run:disabled {
+  background: #a5b4fc;
+  cursor: default;
+}
+
+/* ---- results ---- */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.stat {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.stat-label {
+  font-size: 0.72rem;
+  color: #6b7280;
+}
+
+.verdict {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 1.3rem;
+  font-weight: 800;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.verdict span {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.verdict.hit {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.verdict.miss {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* ---- charts ---- */
+.chart {
+  width: 100%;
+  height: auto;
+  background: #fff;
+  border: 1px solid #f3f4f6;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.chart .grid {
+  stroke: #f3f4f6;
+  stroke-width: 1;
+}
+
+.chart .axis {
+  stroke: #9ca3af;
+  stroke-width: 1;
+}
+
+.chart .tick {
+  fill: #6b7280;
+  font-size: 11px;
+}
+
+.chart .axis-label {
+  fill: #374151;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.chart .marker {
+  fill: #f59e0b;
+  stroke: #b45309;
+  stroke-width: 1.5;
 }
 
 .form {

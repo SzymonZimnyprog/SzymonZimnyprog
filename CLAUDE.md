@@ -4,11 +4,21 @@ This file provides guidance to AI assistants (Claude, etc.) working in this repo
 
 ## Project Overview
 
-Full-stack web application:
+Full-stack web application — a **parametric interceptor-missile & solid-rocket-motor
+simulator**:
 - **Backend**: Python 3.12 + FastAPI — REST API served at `http://localhost:8000`
 - **Frontend**: React 18 + TypeScript + Vite — dev server at `http://localhost:5173`
 
 The frontend proxies all `/api/*` requests to the backend (configured in `vite.config.ts`).
+
+The simulation core (`backend/sim/`) models solid rocket motor internal
+ballistics, 3-DOF flight dynamics and proportional-navigation interception, and
+exports geometry to **CAD** (STL / OpenSCAD) and time histories to
+**Simulink / MATLAB** (CSV, RASP `.eng`, REST driver). See
+[`docs/SIMULATION.md`](docs/SIMULATION.md) for the full physics and workflows.
+It is an engineering/physics simulator built on standard public models — no
+warhead, lethality, fuzing or propellant-manufacturing content; intercept is a
+purely kinematic closest-approach criterion.
 
 ## Repository Structure
 
@@ -20,28 +30,57 @@ The frontend proxies all `/api/*` requests to the backend (configured in `vite.c
 ├── pyproject.toml             # Python tool config (pytest, ruff)
 ├── .gitignore
 │
+├── docs/
+│   └── SIMULATION.md          # Physics models, CAD & Simulink workflows
+│
 ├── backend/
-│   ├── main.py                # FastAPI app entry point
-│   ├── requirements.txt       # Production dependencies
+│   ├── main.py                # FastAPI app entry point (registers routers)
+│   ├── requirements.txt       # Production dependencies (incl. numpy)
 │   ├── requirements-dev.txt   # Dev/test dependencies
 │   ├── .env.example           # Env var template — copy to .env
 │   ├── Dockerfile
+│   ├── sim/                   # Simulation core (pure Python + numpy)
+│   │   ├── atmosphere.py      #   ISA 1976 standard atmosphere
+│   │   ├── propellant.py      #   thermochemistry, burn-rate law, presets
+│   │   ├── grain.py           #   parametric grain geometry + regression
+│   │   ├── motor.py           #   internal ballistics -> thrust curve
+│   │   ├── aerodynamics.py    #   Mach-dependent drag model
+│   │   ├── dynamics.py        #   3-DOF point-mass flight integrator (RK4)
+│   │   ├── guidance.py        #   proportional-navigation guidance law
+│   │   ├── engagement.py      #   interceptor-vs-target engagement
+│   │   └── models.py          #   Pydantic schemas + builders
+│   ├── export/                # CAD + Simulink exporters
+│   │   ├── stl.py             #   surface-of-revolution STL meshes
+│   │   ├── openscad.py        #   parametric OpenSCAD source
+│   │   └── simulink.py        #   CSV, RASP .eng, MATLAB driver
 │   ├── routers/
-│   │   └── items.py           # Example CRUD router
+│   │   ├── items.py           # Example CRUD router
+│   │   ├── motor.py           # /api/motor
+│   │   ├── missile.py         # /api/missile
+│   │   ├── engagement.py      # /api/engagement
+│   │   └── export.py          # /api/export (CAD + Simulink)
 │   └── tests/
-│       └── test_items.py
+│       ├── test_items.py
+│       ├── test_motor.py
+│       ├── test_missile.py
+│       ├── test_engagement.py
+│       └── test_export.py
 │
 └── frontend/
     ├── index.html
     ├── package.json
     ├── tsconfig.json
     ├── vite.config.ts
+    ├── eslint.config.js       # ESLint flat config (TS + browser globals)
     ├── Dockerfile
     └── src/
         ├── main.tsx           # React entry point
-        ├── App.tsx            # Root component
+        ├── App.tsx            # Root component (tabbed shell)
         ├── App.test.tsx       # Component tests (Vitest)
         ├── api.ts             # Typed API client (fetch wrapper)
+        ├── defaults.ts        # Default parameter sets
+        ├── components/        # NumberField, LineChart, TrajectoryPlot
+        ├── pages/             # Motor / Missile / Engagement / Items pages
         ├── index.css
         └── App.css
 ```
