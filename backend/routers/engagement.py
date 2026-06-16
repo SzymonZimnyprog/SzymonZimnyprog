@@ -1,12 +1,22 @@
 """Interceptor-vs-target engagement endpoints."""
 
 from fastapi import APIRouter
+from pydantic import BaseModel, Field
 
 from backend.sim.engagement import simulate_engagement
 from backend.sim.firecontrol import solve_firing_solution
 from backend.sim.models import EngagementRequest
+from backend.sim.salvo import simulate_salvo
 
 router = APIRouter()
+
+
+class SalvoRequest(BaseModel):
+    engagement: EngagementRequest = EngagementRequest()
+    count: int = Field(3, ge=1, le=8)
+    stagger: float = Field(1.0, ge=0.0, le=30.0, description="s between launches")
+    elevation_spread: float = Field(6.0, ge=0.0, le=40.0, description="deg total")
+    auto_aim: bool = True
 
 
 @router.post("/simulate")
@@ -45,5 +55,28 @@ def solve(req: EngagementRequest):
         lethal_radius=req.lethal_radius,
     )
     out = solution.as_dict()
+    out["interceptor_motor_summary"] = motor_res.as_dict()["summary"]
+    return out
+
+
+@router.post("/salvo")
+def salvo(req: SalvoRequest):
+    """Fire a staggered salvo of interceptors at one target (layered defence)."""
+    eng = req.engagement
+    interceptor, motor_res = eng.interceptor.build()
+    target = eng.target.to_target()
+    result = simulate_salvo(
+        interceptor,
+        target,
+        launch_speed=eng.interceptor.launch_speed,
+        count=req.count,
+        stagger=req.stagger,
+        elevation_spread=req.elevation_spread,
+        auto_aim=req.auto_aim,
+        dt=eng.dt,
+        max_time=eng.max_time,
+        lethal_radius=eng.lethal_radius,
+    )
+    out = result.as_dict()
     out["interceptor_motor_summary"] = motor_res.as_dict()["summary"]
     return out

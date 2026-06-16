@@ -109,6 +109,22 @@ def _target_rk4(state: np.ndarray, dt: float, target: Target) -> np.ndarray:
     return state + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
 
 
+def advance_target(target: Target, duration: float, dt: float = 0.05) -> Target:
+    """Return a copy of the target propagated forward by ``duration`` seconds."""
+    from dataclasses import replace
+
+    if duration <= 0.0:
+        return target
+    state = np.empty(6)
+    state[0:3] = target.position
+    state[3:6] = target.velocity
+    steps = max(1, int(round(duration / dt)))
+    h = duration / steps
+    for _ in range(steps):
+        state = _target_rk4(state, h, target)
+    return replace(target, position=state[0:3].copy(), velocity=state[3:6].copy())
+
+
 def simulate_engagement(
     interceptor: Interceptor,
     target: Target,

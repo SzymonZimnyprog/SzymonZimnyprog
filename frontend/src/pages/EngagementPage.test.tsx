@@ -65,4 +65,26 @@ describe("EngagementPage", () => {
     expect(await screen.findByText(/elevation 25.2°/i)).toBeTruthy();
     expect(screen.getByText("Firing solution")).toBeTruthy();
   });
+
+  it("shows salvo results after firing", async () => {
+    vi.mocked(api.salvoEngagement).mockResolvedValue({
+      count: 3,
+      hits: 2,
+      intercepted: true,
+      best_miss: 1.2,
+      azimuth_deg: 90,
+      success_fraction: 2 / 3,
+      shots: [
+        { index: 0, launch_time: 0, elevation_deg: 42, intercepted: false, miss_distance: 7, intercept_time: 18 },
+        { index: 1, launch_time: 1.5, elevation_deg: 45, intercepted: true, miss_distance: 1.2, intercept_time: 19 },
+        { index: 2, launch_time: 3, elevation_deg: 48, intercepted: true, miss_distance: 3, intercept_time: 20 },
+      ],
+      interceptor_motor_summary: result.interceptor_motor_summary,
+    } as never);
+    const user = userEvent.setup();
+    render(<EngagementPage />);
+    await user.click(screen.getByRole("button", { name: /Fire salvo/i }));
+    expect(await screen.findByText(/TARGET NEUTRALISED/i)).toBeTruthy();
+    expect(screen.getByText(/2\/3 hits/i)).toBeTruthy();
+  });
 });

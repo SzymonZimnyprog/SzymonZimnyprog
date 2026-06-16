@@ -223,6 +223,37 @@ export interface FireSolution {
 export const solveEngagement = (req: EngagementRequest) =>
   postJson<FireSolution>("/engagement/solve", req);
 
+export interface SalvoShot {
+  index: number;
+  launch_time: number;
+  elevation_deg: number;
+  intercepted: boolean;
+  miss_distance: number;
+  intercept_time: number;
+}
+
+export interface SalvoResult {
+  count: number;
+  hits: number;
+  intercepted: boolean;
+  best_miss: number;
+  azimuth_deg: number;
+  success_fraction: number;
+  shots: SalvoShot[];
+  interceptor_motor_summary: MotorResult["summary"];
+}
+
+export interface SalvoRequest {
+  engagement: EngagementRequest;
+  count: number;
+  stagger: number;
+  elevation_spread: number;
+  auto_aim: boolean;
+}
+
+export const salvoEngagement = (req: SalvoRequest) =>
+  postJson<SalvoResult>("/engagement/salvo", req);
+
 export interface MotorSweepResult {
   parameter: string;
   points: { value: number; summary: MotorResult["summary"] }[];

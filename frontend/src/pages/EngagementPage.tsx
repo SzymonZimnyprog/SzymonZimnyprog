@@ -1,11 +1,13 @@
 import { useState } from "react";
 import {
   downloadExport,
+  salvoEngagement,
   simulateEngagement,
   solveEngagement,
   type EngagementRequest,
   type EngagementResult,
   type FireSolution,
+  type SalvoResult,
 } from "../api";
 import { defaultEngagement } from "../defaults";
 import LineChart from "../components/LineChart";
@@ -19,6 +21,8 @@ export default function EngagementPage() {
   );
   const [result, setResult] = useState<EngagementResult | null>(null);
   const [solution, setSolution] = useState<FireSolution | null>(null);
+  const [salvo, setSalvo] = useState<SalvoResult | null>(null);
+  const [salvoCount, setSalvoCount] = useState(3);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +48,7 @@ export default function EngagementPage() {
     setBusy(true);
     setError(null);
     setSolution(null);
+    setSalvo(null);
     try {
       setResult(await simulateEngagement(req));
     } catch (e) {
@@ -83,9 +88,30 @@ export default function EngagementPage() {
     e.target.value = "";
   }
 
+  async function fireSalvo() {
+    setBusy(true);
+    setError(null);
+    try {
+      setSalvo(
+        await salvoEngagement({
+          engagement: req,
+          count: salvoCount,
+          stagger: 1.5,
+          elevation_spread: 8,
+          auto_aim: true,
+        })
+      );
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function solve() {
     setBusy(true);
     setError(null);
+    setSalvo(null);
     try {
       const sol = await solveEngagement(req);
       setSolution(sol);
@@ -178,6 +204,13 @@ export default function EngagementPage() {
           <button className="run secondary" onClick={solve} disabled={busy}>
             {busy ? "Solving…" : "Auto-aim — compute firing solution"}
           </button>
+          <div className="salvo-row">
+            <NumberField label="Salvo shots" step={1} min={1} max={8} value={salvoCount}
+              onChange={(v) => setSalvoCount(Math.max(1, Math.min(8, Math.round(v))))} />
+            <button className="run secondary" onClick={fireSalvo} disabled={busy}>
+              {busy ? "Firing…" : "Fire salvo (layered)"}
+            </button>
+          </div>
           <div className="export-row" style={{ marginTop: "0.6rem" }}>
             <button onClick={saveScenario}>Save scenario</button>
             <label className="filebtn">
@@ -279,7 +312,43 @@ export default function EngagementPage() {
               </div>
             </>
           )}
-          {!s && <p className="muted">Configure the scenario and run the engagement.</p>}
+          {salvo && (
+            <>
+              <div className={`verdict ${salvo.intercepted ? "hit" : "miss"}`}>
+                {salvo.intercepted ? "✓ TARGET NEUTRALISED" : "✗ LEAKER"}
+                <span>
+                  {salvo.hits}/{salvo.count} hits · Pk {(salvo.success_fraction * 100).toFixed(0)}% ·
+                  best miss {salvo.best_miss.toFixed(1)} m · azimuth {salvo.azimuth_deg.toFixed(1)}°
+                </span>
+              </div>
+              <table className="shots">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Launch t</th>
+                    <th>Elevation</th>
+                    <th>Miss</th>
+                    <th>Result</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {salvo.shots.map((sh) => (
+                    <tr key={sh.index} className={sh.intercepted ? "hit" : ""}>
+                      <td>{sh.index + 1}</td>
+                      <td>{sh.launch_time.toFixed(1)} s</td>
+                      <td>{sh.elevation_deg.toFixed(1)}°</td>
+                      <td>{sh.miss_distance.toFixed(1)} m</td>
+                      <td>{sh.intercepted ? "HIT" : "miss"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+
+          {!s && !salvo && (
+            <p className="muted">Configure the scenario and run the engagement.</p>
+          )}
         </section>
       </div>
     </div>

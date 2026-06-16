@@ -103,6 +103,15 @@ Returns the firing solution, the launch **envelope** (miss vs elevation) and
 the full engagement at the solution for plotting. In the web app this is the
 **Auto-aim** button on the Interception tab.
 
+### Salvo / layered defence (`POST /api/engagement/salvo`)
+
+Fires `count` interceptors from one site, `stagger` seconds apart, with launch
+elevations spread symmetrically about the (auto-aimed) nominal solution. Each
+later shot engages the target where it has moved to by its launch time
+(`advance_target`). Reports per-shot outcome, number of hits and a kill
+probability `Pk = hits / count`. In the web app: **Fire salvo** on the
+Interception tab.
+
 ## CAD workflow
 
 Every motor/airframe parameter set can be exported as geometry:
