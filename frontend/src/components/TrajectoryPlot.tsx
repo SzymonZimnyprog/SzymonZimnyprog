@@ -8,6 +8,7 @@ interface Path {
 interface TrajectoryPlotProps {
   paths: Path[];
   marker?: { ground: number; alt: number; label: string } | null;
+  markers?: { ground: number; alt: number; label: string }[];
   width?: number;
   height?: number;
 }
@@ -19,6 +20,7 @@ interface TrajectoryPlotProps {
 export default function TrajectoryPlot({
   paths,
   marker = null,
+  markers = [],
   width = 560,
   height = 360,
 }: TrajectoryPlotProps) {
@@ -30,8 +32,9 @@ export default function TrajectoryPlot({
   const allA = paths.flatMap((p) => p.alt);
   if (allG.length === 0) return <p className="muted">No trajectory to plot.</p>;
 
-  const gMax = Math.max(...allG, marker?.ground ?? 0) || 1;
-  const aMax = Math.max(...allA, marker?.alt ?? 0) || 1;
+  const allMarkers = [...markers, ...(marker ? [marker] : [])];
+  const gMax = Math.max(...allG, ...allMarkers.map((m) => m.ground)) || 1;
+  const aMax = Math.max(...allA, ...allMarkers.map((m) => m.alt)) || 1;
 
   const sx = (g: number) => pad.left + (g / gMax) * plotW;
   const sy = (a: number) => pad.top + plotH - (a / aMax) * plotH;
@@ -73,14 +76,14 @@ export default function TrajectoryPlot({
         return <path key={p.label} d={d} fill="none" stroke={p.color} strokeWidth={2} />;
       })}
 
-      {marker && (
-        <g>
-          <circle cx={sx(marker.ground)} cy={sy(marker.alt)} r={7} className="marker" />
-          <text x={sx(marker.ground) + 10} y={sy(marker.alt) - 8} className="tick">
-            {marker.label}
+      {allMarkers.map((m, i) => (
+        <g key={i}>
+          <circle cx={sx(m.ground)} cy={sy(m.alt)} r={6} className="marker" />
+          <text x={sx(m.ground) + 8} y={sy(m.alt) - 6} className="tick">
+            {m.label}
           </text>
         </g>
-      )}
+      ))}
 
       <text x={width / 2} y={height - 6} className="axis-label" textAnchor="middle">
         Ground range (km)

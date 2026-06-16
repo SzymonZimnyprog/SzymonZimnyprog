@@ -324,6 +324,47 @@ export interface StackResult {
 export const simulateMultiStage = (stages: Stage[]) =>
   postJson<StackResult>("/motor/multistage", { stages });
 
+export interface FlightStage {
+  motor: MotorRequest;
+  ignition_delay: number;
+  structural_mass: number;
+}
+
+export interface SeparationEvent {
+  time: number;
+  altitude: number;
+  mass_after: number;
+}
+
+export interface StagedTrajectoryResult {
+  time: number[];
+  position: number[][];
+  velocity: number[][];
+  speed: number[];
+  mach: number[];
+  mass: number[];
+  altitude: number[];
+  summary: TrajectoryResult["summary"];
+  separations: SeparationEvent[];
+  stage_starts: number[];
+  initial_mass: number;
+  total_impulse: number;
+}
+
+export interface MultiStageFlightRequest {
+  stages: FlightStage[];
+  payload: Airframe;
+  launch_speed: number;
+  elevation_deg: number;
+  azimuth_deg: number;
+  drop_last_stage: boolean;
+  dt: number;
+  max_time: number;
+}
+
+export const flyStack = (req: MultiStageFlightRequest) =>
+  postJson<StagedTrajectoryResult>("/missile/multistage", req);
+
 export async function fetchPropellantPresets(): Promise<
   Record<string, Propellant>
 > {
