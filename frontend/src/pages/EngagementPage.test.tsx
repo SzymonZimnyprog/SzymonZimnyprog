@@ -87,4 +87,24 @@ describe("EngagementPage", () => {
     expect(await screen.findByText(/TARGET NEUTRALISED/i)).toBeTruthy();
     expect(screen.getByText(/2\/3 hits/i)).toBeTruthy();
   });
+
+  it("shows Monte-Carlo Pk after running", async () => {
+    vi.mocked(api.montecarloEngagement).mockResolvedValue({
+      trials: 100,
+      hits: 87,
+      pk: 0.87,
+      elevation_deg: 49,
+      azimuth_deg: 90,
+      mean_miss: 3,
+      median_miss: 3.1,
+      p90_miss: 5.1,
+      histogram_edges: [0, 1, 2, 3],
+      histogram_counts: [10, 40, 37],
+    } as never);
+    const user = userEvent.setup();
+    render(<EngagementPage />);
+    await user.click(screen.getByRole("button", { name: /Run Monte-Carlo/i }));
+    expect(await screen.findByText(/Pk 87%/i)).toBeTruthy();
+    expect(screen.getByText(/87\/100 kills/i)).toBeTruthy();
+  });
 });

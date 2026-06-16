@@ -1,12 +1,14 @@
 import { useState } from "react";
 import {
   downloadExport,
+  montecarloEngagement,
   salvoEngagement,
   simulateEngagement,
   solveEngagement,
   type EngagementRequest,
   type EngagementResult,
   type FireSolution,
+  type MonteCarloResult,
   type SalvoResult,
 } from "../api";
 import { defaultEngagement } from "../defaults";
@@ -23,6 +25,10 @@ export default function EngagementPage() {
   const [solution, setSolution] = useState<FireSolution | null>(null);
   const [salvo, setSalvo] = useState<SalvoResult | null>(null);
   const [salvoCount, setSalvoCount] = useState(3);
+  const [mc, setMc] = useState<MonteCarloResult | null>(null);
+  const [trials, setTrials] = useState(150);
+  const [posSigma, setPosSigma] = useState(300);
+  const [velSigma, setVelSigma] = useState(25);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -86,6 +92,26 @@ export default function EngagementPage() {
     };
     reader.readAsText(file);
     e.target.value = "";
+  }
+
+  async function runMonteCarlo() {
+    setBusy(true);
+    setError(null);
+    try {
+      setMc(
+        await montecarloEngagement({
+          engagement: req,
+          trials,
+          position_sigma: posSigma,
+          velocity_sigma: velSigma,
+          seed: 0,
+        })
+      );
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function fireSalvo() {
@@ -211,6 +237,19 @@ export default function EngagementPage() {
               {busy ? "Firing…" : "Fire salvo (layered)"}
             </button>
           </div>
+
+          <h3>Monte-Carlo Pk (track uncertainty)</h3>
+          <div className="grid">
+            <NumberField label="Trials" step={10} min={10} max={1000} value={trials}
+              onChange={(v) => setTrials(Math.max(10, Math.min(1000, Math.round(v))))} />
+            <NumberField label="Pos σ" unit="m" step={50} value={posSigma}
+              onChange={(v) => setPosSigma(Math.max(0, v))} />
+            <NumberField label="Vel σ" unit="m/s" step={5} value={velSigma}
+              onChange={(v) => setVelSigma(Math.max(0, v))} />
+          </div>
+          <button className="run secondary" onClick={runMonteCarlo} disabled={busy}>
+            {busy ? "Running…" : "Run Monte-Carlo"}
+          </button>
           <div className="export-row" style={{ marginTop: "0.6rem" }}>
             <button onClick={saveScenario}>Save scenario</button>
             <label className="filebtn">
@@ -346,7 +385,31 @@ export default function EngagementPage() {
             </>
           )}
 
-          {!s && !salvo && (
+          {mc && (
+            <>
+              <div className={`verdict ${mc.pk >= 0.8 ? "hit" : "miss"}`}>
+                Pk {(mc.pk * 100).toFixed(0)}%
+                <span>
+                  {mc.hits}/{mc.trials} kills · mean miss {mc.mean_miss.toFixed(1)} m ·
+                  median {mc.median_miss.toFixed(1)} m · p90 {mc.p90_miss.toFixed(1)} m
+                </span>
+              </div>
+              <LineChart
+                xlabel="Miss distance (m)"
+                ylabel="Trials"
+                series={[{
+                  label: "Miss histogram",
+                  color: "#7c3aed",
+                  x: mc.histogram_counts.map(
+                    (_, i) => 0.5 * (mc.histogram_edges[i] + mc.histogram_edges[i + 1])
+                  ),
+                  y: mc.histogram_counts,
+                }]}
+              />
+            </>
+          )}
+
+          {!s && !salvo && !mc && (
             <p className="muted">Configure the scenario and run the engagement.</p>
           )}
         </section>

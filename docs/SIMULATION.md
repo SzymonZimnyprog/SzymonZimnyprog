@@ -112,6 +112,17 @@ later shot engages the target where it has moved to by its launch time
 probability `Pk = hits / count`. In the web app: **Fire salvo** on the
 Interception tab.
 
+### Monte-Carlo Pk (`POST /api/engagement/montecarlo`)
+
+The launcher aims once at the estimated (nominal) track; the true target is
+then drawn `trials` times by adding Gaussian noise (`position_sigma`,
+`velocity_sigma`) and flown against the fixed firing solution. Returns the kill
+probability, miss-distance statistics (mean / median / p90) and a histogram.
+The closest approach is computed analytically per step (closest point of
+approach), so the miss distance — and therefore Pk — is accurate regardless of
+the integration step. In the web app: **Run Monte-Carlo** on the Interception
+tab.
+
 ## CAD workflow
 
 Every motor/airframe parameter set can be exported as geometry:

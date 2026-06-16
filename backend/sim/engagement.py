@@ -31,6 +31,21 @@ def _unit(v: np.ndarray) -> np.ndarray:
     return v / n if n > 1e-9 else np.zeros(3)
 
 
+def _closest_approach(r0: np.ndarray, r1: np.ndarray) -> float:
+    """Minimum separation along the segment of relative position r0 -> r1.
+
+    Treats the relative motion over one integration step as linear (closest
+    point of approach), so the recorded miss distance is accurate even when the
+    step is large compared with the closing speed."""
+    d = r1 - r0
+    dd = float(np.dot(d, d))
+    if dd < 1e-12:
+        return float(np.linalg.norm(r0))
+    s = -float(np.dot(r0, d)) / dd
+    s = max(0.0, min(1.0, s))
+    return float(np.linalg.norm(r0 + s * d))
+
+
 @dataclass
 class Target:
     position: np.ndarray            # m, ENU
@@ -148,11 +163,15 @@ def simulate_engagement(
     t = 0.0
     step = 0
     prev_sep = float("inf")
+    prev_rel = t_state[0:3] - m_state[0:3]
 
     while t <= max_time:
         r_m, v_m = m_state[0:3], m_state[3:6]
         r_t, v_t = t_state[0:3], t_state[3:6]
-        sep = float(np.linalg.norm(r_t - r_m))
+        rel = r_t - r_m
+        sep = float(np.linalg.norm(rel))
+        # True closest approach over the step just taken (robust to dt).
+        cpa = sep if step == 0 else _closest_approach(prev_rel, rel)
 
         # Guidance command.
         a_cmd = np.zeros(3)
@@ -172,15 +191,15 @@ def simulate_engagement(
             res.target_speed.append(float(np.linalg.norm(v_t)))
             res.interceptor_accel_cmd.append(float(np.linalg.norm(a_cmd)))
 
-        # Track closest approach.
-        if sep < res.miss_distance:
-            res.miss_distance = sep
+        # Track closest approach (using the analytic CPA for this step).
+        if cpa < res.miss_distance:
+            res.miss_distance = cpa
             res.intercept_time = t
             res.intercept_point = (0.5 * (r_m + r_t)).tolist()
             res.closing_speed_at_intercept = closing_speed(r_m, v_m, r_t, v_t)
 
         # Intercept criterion.
-        if sep <= lethal_radius:
+        if cpa <= lethal_radius:
             res.intercepted = True
             break
 
@@ -188,6 +207,7 @@ def simulate_engagement(
         if sep > prev_sep and t > interceptor.seeker_delay:
             break
         prev_sep = sep
+        prev_rel = rel.copy()
 
         # Stop if either vehicle hits the ground while descending.
         m_down = m_state[2] < 0.0 and m_state[5] < 0.0

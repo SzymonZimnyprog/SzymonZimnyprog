@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from backend.sim.engagement import simulate_engagement
 from backend.sim.firecontrol import solve_firing_solution
 from backend.sim.models import EngagementRequest
+from backend.sim.montecarlo import montecarlo_pk
 from backend.sim.salvo import simulate_salvo
 
 router = APIRouter()
@@ -17,6 +18,14 @@ class SalvoRequest(BaseModel):
     stagger: float = Field(1.0, ge=0.0, le=30.0, description="s between launches")
     elevation_spread: float = Field(6.0, ge=0.0, le=40.0, description="deg total")
     auto_aim: bool = True
+
+
+class MonteCarloRequest(BaseModel):
+    engagement: EngagementRequest = EngagementRequest()
+    trials: int = Field(150, ge=10, le=1000)
+    position_sigma: float = Field(200.0, ge=0.0, description="track pos error, m")
+    velocity_sigma: float = Field(20.0, ge=0.0, description="track vel error, m/s")
+    seed: int = Field(0, ge=0)
 
 
 @router.post("/simulate")
@@ -80,3 +89,23 @@ def salvo(req: SalvoRequest):
     out = result.as_dict()
     out["interceptor_motor_summary"] = motor_res.as_dict()["summary"]
     return out
+
+
+@router.post("/montecarlo")
+def montecarlo(req: MonteCarloRequest):
+    """Estimate kill probability under Gaussian target-track uncertainty."""
+    eng = req.engagement
+    interceptor, _motor = eng.interceptor.build()
+    target = eng.target.to_target()
+    result = montecarlo_pk(
+        interceptor,
+        target,
+        launch_speed=eng.interceptor.launch_speed,
+        trials=req.trials,
+        position_sigma=req.position_sigma,
+        velocity_sigma=req.velocity_sigma,
+        seed=req.seed,
+        max_time=eng.max_time,
+        lethal_radius=eng.lethal_radius,
+    )
+    return result.as_dict()

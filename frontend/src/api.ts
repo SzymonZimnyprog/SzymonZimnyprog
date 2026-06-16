@@ -254,6 +254,30 @@ export interface SalvoRequest {
 export const salvoEngagement = (req: SalvoRequest) =>
   postJson<SalvoResult>("/engagement/salvo", req);
 
+export interface MonteCarloResult {
+  trials: number;
+  hits: number;
+  pk: number;
+  elevation_deg: number;
+  azimuth_deg: number;
+  mean_miss: number;
+  median_miss: number;
+  p90_miss: number;
+  histogram_edges: number[];
+  histogram_counts: number[];
+}
+
+export interface MonteCarloRequest {
+  engagement: EngagementRequest;
+  trials: number;
+  position_sigma: number;
+  velocity_sigma: number;
+  seed: number;
+}
+
+export const montecarloEngagement = (req: MonteCarloRequest) =>
+  postJson<MonteCarloResult>("/engagement/montecarlo", req);
+
 export interface MotorSweepResult {
   parameter: string;
   points: { value: number; summary: MotorResult["summary"] }[];
