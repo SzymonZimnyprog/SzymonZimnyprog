@@ -7,8 +7,12 @@ import math
 from nicegui import run, ui
 
 from backend.routers.engagement import (
+    DefendedAreaRequest,
     MonteCarloRequest,
     SalvoRequest,
+)
+from backend.routers.engagement import (
+    defended_area_endpoint as defended_endpoint,
 )
 from backend.routers.engagement import (
     montecarlo as eng_montecarlo,
@@ -31,6 +35,7 @@ from .common import (
     bar_fig,
     card,
     header,
+    heatmap_fig,
     line_fig,
     num,
     page_body,
@@ -71,6 +76,11 @@ def engagement_page() -> None:
         "mc_trials": 150,
         "mc_pos_sigma": 200.0,
         "mc_vel_sigma": 20.0,
+        "da_speed": 300.0,
+        "da_dr_max": 30000.0,
+        "da_alt_max": 13000.0,
+        "da_dr_steps": 8,
+        "da_alt_steps": 6,
     }
     result: dict = {"mode": None, "data": None}
 
@@ -186,6 +196,20 @@ def engagement_page() -> None:
                     mc_btn = ui.button("Run Monte-Carlo", icon="analytics")
                     mc_btn.props("color=secondary").classes("w-full")
 
+                with card("Defended area", "map").classes("w-full"):
+                    ui.label(
+                        "Auto-aim at an inbound target across a downrange × "
+                        "altitude grid — the reachable intercept envelope."
+                    ).classes("text-xs text-slate-500")
+                    with ui.grid(columns=3).classes("gap-2 w-full"):
+                        num(extra, "da_speed", "Tgt speed", unit="m/s", step=25)
+                        num(extra, "da_dr_max", "Range max", unit="m", step=2000)
+                        num(extra, "da_alt_max", "Alt max", unit="m", step=1000)
+                        num(extra, "da_dr_steps", "Range steps", step=1, min=2, max=14)
+                        num(extra, "da_alt_steps", "Alt steps", step=1, min=2, max=14)
+                    da_btn = ui.button("Map defended area", icon="map")
+                    da_btn.props("color=positive").classes("w-full")
+
             results = ui.column().classes("flex-grow gap-3 min-w-[420px]")
 
     # ---- actions -------------------------------------------------------- #
@@ -233,6 +257,21 @@ def engagement_page() -> None:
         )
         await _run(mc_btn, "montecarlo", eng_montecarlo, req)
 
+    async def map_area():
+        req = DefendedAreaRequest.model_validate(
+            {
+                "engagement": state,
+                "target_speed": extra["da_speed"],
+                "downrange_min": 3000.0,
+                "downrange_max": extra["da_dr_max"],
+                "downrange_steps": int(extra["da_dr_steps"]),
+                "altitude_min": 1000.0,
+                "altitude_max": extra["da_alt_max"],
+                "altitude_steps": int(extra["da_alt_steps"]),
+            }
+        )
+        await _run(da_btn, "defended", defended_endpoint, req)
+
     # ---- rendering ------------------------------------------------------ #
     def render():
         results.clear()
@@ -244,11 +283,36 @@ def engagement_page() -> None:
                 _render_salvo(data)
             elif mode == "montecarlo":
                 _render_montecarlo(data)
+            elif mode == "defended":
+                _render_defended(data)
 
     run_btn.on_click(engage)
     solve_btn.on_click(autoaim)
     salvo_btn.on_click(fire_salvo)
     mc_btn.on_click(run_mc)
+    da_btn.on_click(map_area)
+
+
+def _render_defended(data: dict) -> None:
+    ui.label("Defended area").classes("text-2xl font-bold text-green-700")
+    stats_row([
+        ("Cells reachable", f"{data['hit_fraction'] * 100:.0f}%"),
+        ("Grid", f"{len(data['values_x'])}×{len(data['values_y'])}"),
+        ("Target speed", "inbound"),
+    ])
+    ui.label(
+        "Miss distance (m) by target downrange × altitude — green = intercept, "
+        "red = leaker. Capped at "
+        f"{data['miss_cap']:.0f} m."
+    ).classes("text-sm text-slate-500")
+    xs = [v / 1000.0 for v in data["values_x"]]
+    ys = [v / 1000.0 for v in data["values_y"]]
+    plot(
+        heatmap_fig(
+            xs, ys, data["miss"], "Target downrange (km)", "Target altitude (km)",
+            "Miss (m)", colorscale="RdYlGn", reversescale=True,
+        )
+    )
 
 
 def _ground(positions: list[list[float]], origin: list[float]) -> list[float]:

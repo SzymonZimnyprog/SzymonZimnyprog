@@ -515,11 +515,13 @@ def heatmap_fig(
     metric: str,
     *,
     height: int = 420,
+    colorscale: str = "Viridis",
+    reversescale: bool = False,
 ) -> go.Figure:
     fig = go.Figure(
         go.Heatmap(
-            x=values_x, y=values_y, z=z, colorscale="Viridis",
-            colorbar=dict(title=metric),
+            x=values_x, y=values_y, z=z, colorscale=colorscale,
+            reversescale=reversescale, colorbar=dict(title=metric),
         )
     )
     fig.update_layout(

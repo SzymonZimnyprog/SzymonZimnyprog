@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from backend.sim.coverage import defended_area
 from backend.sim.engagement import simulate_engagement
 from backend.sim.firecontrol import solve_firing_solution
 from backend.sim.models import EngagementRequest
@@ -10,6 +11,22 @@ from backend.sim.montecarlo import montecarlo_pk
 from backend.sim.salvo import simulate_salvo
 
 router = APIRouter()
+
+
+def _linspace(lo: float, hi: float, n: int) -> list[float]:
+    n = max(2, int(n))
+    return [lo + (hi - lo) * i / (n - 1) for i in range(n)]
+
+
+class DefendedAreaRequest(BaseModel):
+    engagement: EngagementRequest = EngagementRequest()
+    target_speed: float = Field(300.0, gt=0, description="inbound speed, m/s")
+    downrange_min: float = Field(3000.0, ge=0)
+    downrange_max: float = Field(30000.0, gt=0)
+    downrange_steps: int = Field(8, ge=2, le=14)
+    altitude_min: float = Field(1000.0, ge=0)
+    altitude_max: float = Field(13000.0, gt=0)
+    altitude_steps: int = Field(6, ge=2, le=14)
 
 
 class SalvoRequest(BaseModel):
@@ -90,6 +107,23 @@ def salvo(req: SalvoRequest):
     out = result.as_dict()
     out["interceptor_motor_summary"] = motor_res.as_dict()["summary"]
     return out
+
+
+@router.post("/defended_area")
+def defended_area_endpoint(req: DefendedAreaRequest):
+    """Map intercept miss/outcome over a grid of target downrange and altitude."""
+    eng = req.engagement
+    interceptor, _motor = eng.interceptor.build()
+    template = eng.target.to_target()
+    xs = _linspace(req.downrange_min, req.downrange_max, req.downrange_steps)
+    zs = _linspace(req.altitude_min, req.altitude_max, req.altitude_steps)
+    return defended_area(
+        interceptor, template,
+        launch_speed=eng.interceptor.launch_speed,
+        target_speed=req.target_speed,
+        downrange=xs, altitudes=zs,
+        max_time=eng.max_time, lethal_radius=eng.lethal_radius,
+    )
 
 
 @router.post("/montecarlo")
