@@ -120,6 +120,10 @@ GUIDANCE = {
     "seeker_update_rate": "Seeker measurement rate (Hz). The noisy fix is held "
     "between updates; 0 = continuous (refreshed every step). 10–50 Hz is "
     "typical — lower rates let noise persist longer and hurt more.",
+    "seeker_track_alpha": "Alpha-beta tracking-filter gain (0 = off). Smooths "
+    "the noisy seeker track before guiding on it: ~0.2–0.4 filters heavily "
+    "(steadier but slight lag), closer to 1 barely filters. Usually raises Pk "
+    "under noise. Shown as the teal 'Filtered track' on the plots.",
 }
 
 # Target -------------------------------------------------------------------- #

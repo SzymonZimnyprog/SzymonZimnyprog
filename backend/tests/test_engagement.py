@@ -158,3 +158,49 @@ def test_apn_beats_pn_against_maneuvering_target():
                       json={**base, "interceptor": {"guidance_law": "APN"}}).json()
     # against a manoeuvring target, augmented PN should not do worse
     assert apn["summary"]["miss_distance"] <= pn["summary"]["miss_distance"] + 1e-6
+
+
+# --- alpha-beta tracking filter ------------------------------------------- #
+def test_alpha_beta_tracker_smooths_noisy_constant_velocity():
+    from backend.sim.guidance import AlphaBetaTracker
+    rng = np.random.default_rng(0)
+    tr = AlphaBetaTracker(alpha=0.3)
+    dt = 0.1
+    true_v = np.array([10.0, 0.0, 0.0])
+    pos = np.array([0.0, 0.0, 0.0])
+    errs_raw, errs_filt = [], []
+    for k in range(200):
+        pos = pos + true_v * dt
+        z = pos + rng.normal(0.0, 5.0, 3)
+        est = tr.update(z, dt)
+        if k > 50:  # let it settle
+            errs_raw.append(np.linalg.norm(z - pos))
+            errs_filt.append(np.linalg.norm(est - pos))
+    # filtered estimate is markedly closer to truth than the raw measurement
+    assert np.mean(errs_filt) < 0.7 * np.mean(errs_raw)
+    # velocity estimate tracks the rightward motion (noisy, loose band)
+    assert 4.0 < tr.vel[0] < 16.0
+
+
+def test_tracker_improves_pk_under_seeker_noise():
+    noise = {"seeker_angular_noise": 25.0, "seeker_range_noise": 0.08,
+             "seeker_update_rate": 20.0}
+    raw, filt = [], []
+    for seed in range(8):
+        no_filter = client.post("/api/engagement/simulate", json={
+            "interceptor": noise, "seed": seed}).json()
+        with_filter = client.post("/api/engagement/simulate", json={
+            "interceptor": {**noise, "seeker_track_alpha": 0.3}, "seed": seed}).json()
+        raw.append(no_filter["summary"]["miss_distance"])
+        filt.append(with_filter["summary"]["miss_distance"])
+    # the tracker should reduce the mean miss distance under noise
+    assert np.mean(filt) < np.mean(raw)
+
+
+def test_filtered_track_present_only_with_tracker():
+    plain = client.post("/api/engagement/simulate", json={}).json()
+    assert plain["target_filtered"] == []
+    tracked = client.post("/api/engagement/simulate", json={
+        "interceptor": {"seeker_angular_noise": 20.0, "seeker_update_rate": 20.0,
+                        "seeker_track_alpha": 0.3}, "seed": 1}).json()
+    assert len(tracked["target_filtered"]) > 0

@@ -207,6 +207,9 @@ export default function EngagementPage() {
             <NumberField label="Seeker rate" unit="Hz" step={5} min={0}
               value={it.seeker_update_rate}
               onChange={(v) => patchInt({ seeker_update_rate: v })} />
+            <NumberField label="Tracker α" step={0.05} min={0} max={1}
+              value={it.seeker_track_alpha}
+              onChange={(v) => patchInt({ seeker_track_alpha: v })} />
             <NumberField label="Dry mass" unit="kg" step={1} value={it.airframe.dry_mass}
               onChange={(v) => patchInt({ airframe: { ...it.airframe, dry_mass: v } })} />
           </div>

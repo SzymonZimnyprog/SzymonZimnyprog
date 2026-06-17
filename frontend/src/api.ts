@@ -104,6 +104,7 @@ export interface Interceptor {
   seeker_angular_noise: number;
   seeker_range_noise: number;
   seeker_update_rate: number;
+  seeker_track_alpha: number;
 }
 
 export interface Target {
@@ -175,6 +176,7 @@ export interface EngagementResult {
   interceptor_position: number[][];
   target_position: number[][];
   target_measured: number[][];
+  target_filtered: number[][];
   separation: number[];
   interceptor_speed: number[];
   target_speed: number[];

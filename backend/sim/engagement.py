@@ -23,7 +23,12 @@ import numpy as np
 from .aerodynamics import Airframe
 from .atmosphere import atmosphere
 from .dynamics import GRAVITY, Vehicle, rk4_step
-from .guidance import closing_speed, guidance_command, seeker_measurement
+from .guidance import (
+    AlphaBetaTracker,
+    closing_speed,
+    guidance_command,
+    seeker_measurement,
+)
 
 
 def _unit(v: np.ndarray) -> np.ndarray:
@@ -69,6 +74,7 @@ class Interceptor:
     seeker_angular_noise: float = 0.0   # boresight 1-sigma, rad
     seeker_range_noise: float = 0.0     # range 1-sigma, fraction of range
     seeker_update_rate: float = 0.0     # measurement rate, Hz (0 = continuous)
+    seeker_track_alpha: float = 0.0     # alpha-beta tracker gain (0 = off)
 
 
 @dataclass
@@ -81,6 +87,7 @@ class EngagementResult:
     target_speed: list[float] = field(default_factory=list)
     interceptor_accel_cmd: list[float] = field(default_factory=list)
     target_measured: list[list[float]] = field(default_factory=list)
+    target_filtered: list[list[float]] = field(default_factory=list)
 
     intercepted: bool = False
     miss_distance: float = float("inf")
@@ -94,6 +101,7 @@ class EngagementResult:
             "interceptor_position": self.interceptor_position,
             "target_position": self.target_position,
             "target_measured": self.target_measured,
+            "target_filtered": self.target_filtered,
             "separation": self.separation,
             "interceptor_speed": self.interceptor_speed,
             "target_speed": self.target_speed,
@@ -184,7 +192,11 @@ def simulate_engagement(
     meas_interval = (1.0 / interceptor.seeker_update_rate
                      if interceptor.seeker_update_rate > 0.0 else 0.0)
     r_t_meas = t_state[0:3].copy()
+    r_t_filt = t_state[0:3].copy()
     last_meas_t = -1e9
+    filtering = interceptor.seeker_track_alpha > 0.0
+    tracker = (AlphaBetaTracker(alpha=interceptor.seeker_track_alpha)
+               if filtering else None)
 
     while t <= max_time:
         r_m, v_m = m_state[0:3], m_state[3:6]
@@ -201,13 +213,22 @@ def simulate_engagement(
             if noisy:
                 due = (meas_interval == 0.0) or (t - last_meas_t >= meas_interval)
                 if due:
-                    r_t_meas = seeker_measurement(
+                    z = seeker_measurement(
                         r_m, r_t, rng,
                         angular_sigma_rad=interceptor.seeker_angular_noise,
                         range_frac_sigma=interceptor.seeker_range_noise,
                     )
+                    dt_meas = (t - last_meas_t) if last_meas_t > -1e8 else (
+                        meas_interval or dt)
+                    r_t_meas = z
+                    if tracker is not None:
+                        tracker.update(z, dt_meas)
                     last_meas_t = t
-                r_t_for_guidance = r_t_meas
+                if tracker is not None and tracker.pos is not None:
+                    r_t_filt = tracker.predict(t - last_meas_t)
+                    r_t_for_guidance = r_t_filt
+                else:
+                    r_t_for_guidance = r_t_meas
             else:
                 r_t_for_guidance = r_t
             target_accel = _target_derivative(t_state, target)[3:6]
@@ -226,6 +247,8 @@ def simulate_engagement(
             res.target_position.append(r_t.tolist())
             meas = r_t_meas if (noisy and guided) else r_t
             res.target_measured.append(meas.tolist())
+            if filtering and guided:
+                res.target_filtered.append(list(map(float, r_t_filt)))
             res.separation.append(sep)
             res.interceptor_speed.append(float(np.linalg.norm(v_m)))
             res.target_speed.append(float(np.linalg.norm(v_t)))

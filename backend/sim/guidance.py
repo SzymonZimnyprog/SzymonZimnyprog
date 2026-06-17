@@ -16,9 +16,52 @@ Missile Guidance* -- a control algorithm, not a weapon design.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+
 import numpy as np
 
 from .atmosphere import G0
+
+
+@dataclass
+class AlphaBetaTracker:
+    """Constant-gain (alpha-beta) tracker for a constant-velocity target.
+
+    Smooths a noisy stream of position measurements and estimates velocity. The
+    beta gain is derived from alpha for a critically-damped response. ``alpha``
+    near 1 trusts the measurement (little smoothing); near 0 smooths heavily but
+    lags. This is the steady-state form of a Kalman filter for the
+    constant-velocity model.
+    """
+
+    alpha: float
+    beta: float = 0.0
+    pos: np.ndarray | None = None
+    vel: np.ndarray = field(default_factory=lambda: np.zeros(3))
+
+    def __post_init__(self) -> None:
+        if self.beta <= 0.0:
+            a = self.alpha
+            self.beta = a * a / (2.0 - a) if a < 2.0 else 1.0
+
+    def update(self, z: np.ndarray, dt: float) -> np.ndarray:
+        """Fold in a measurement ``z`` taken ``dt`` after the previous one."""
+        if self.pos is None:
+            self.pos = np.asarray(z, dtype=float).copy()
+            self.vel = np.zeros(3)
+            return self.pos.copy()
+        x_pred = self.pos + self.vel * dt
+        resid = np.asarray(z, dtype=float) - x_pred
+        self.pos = x_pred + self.alpha * resid
+        if dt > 1e-9:
+            self.vel = self.vel + (self.beta / dt) * resid
+        return self.pos.copy()
+
+    def predict(self, dt: float) -> np.ndarray | None:
+        """Propagate the estimate ``dt`` seconds ahead (None before first fix)."""
+        if self.pos is None:
+            return None
+        return self.pos + self.vel * dt
 
 
 def pn_acceleration(

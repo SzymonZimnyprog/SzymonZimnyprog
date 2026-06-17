@@ -144,6 +144,9 @@ def engagement_page() -> None:
                             num(interceptor, "seeker_update_rate", "Update rate",
                                 unit="Hz", step=5, min=0,
                                 help=H.GUIDANCE["seeker_update_rate"])
+                            num(interceptor, "seeker_track_alpha", "Tracker α",
+                                step=0.05, min=0, max=1,
+                                help=H.GUIDANCE["seeker_track_alpha"])
 
                 with card("Target", "adjust").classes("w-full"):
                     vec_inputs("Position", target["position"], "m",
@@ -348,7 +351,9 @@ def _render_engagement(mode: str, data: dict, state: dict) -> None:
     ipos = eng["interceptor_position"]
     tpos = eng["target_position"]
     tmeas = eng.get("target_measured", [])
+    tfilt = eng.get("target_filtered", [])
     noisy = bool(tmeas) and tmeas != tpos
+    filtered = bool(tfilt)
     ig = _ground(ipos, launch)
     tg = _ground(tpos, launch)
     marker2d, marker3d = [], []
@@ -371,6 +376,12 @@ def _render_engagement(mode: str, data: dict, state: dict) -> None:
             {"label": "Seeker track", "color": PALETTE["amber"],
              "x": [p[0] for p in tmeas], "y": [p[1] for p in tmeas],
              "z": [p[2] for p in tmeas]}
+        )
+    if filtered:
+        series3d.append(
+            {"label": "Filtered track", "color": PALETTE["sky"],
+             "x": [p[0] for p in tfilt], "y": [p[1] for p in tfilt],
+             "z": [p[2] for p in tfilt]}
         )
 
     with ui.tabs().classes("w-full") as tabs:
@@ -406,6 +417,11 @@ def _render_engagement(mode: str, data: dict, state: dict) -> None:
                 profile.append(
                     {"label": "Seeker track", "color": PALETTE["amber"],
                      "x": _ground(tmeas, launch), "y": [p[2] for p in tmeas]}
+                )
+            if filtered:
+                profile.append(
+                    {"label": "Filtered track", "color": PALETTE["sky"],
+                     "x": _ground(tfilt, launch), "y": [p[2] for p in tfilt]}
                 )
             plot(xy_fig("Ground range (m)", "Altitude (m)", profile,
                         markers=marker2d))

@@ -205,6 +205,9 @@ class InterceptorModel(BaseModel):
     seeker_update_rate: float = Field(
         0.0, ge=0, le=1000, description="seeker measurement rate, Hz (0 = continuous)"
     )
+    seeker_track_alpha: float = Field(
+        0.0, ge=0, le=1, description="alpha-beta tracker gain (0 = off)"
+    )
 
     def build(self) -> tuple[Interceptor, object]:
         vehicle, curve, motor_res = build_vehicle_and_curve(self.motor, self.airframe)
@@ -222,6 +225,7 @@ class InterceptorModel(BaseModel):
             seeker_angular_noise=self.seeker_angular_noise / 1000.0,  # mrad -> rad
             seeker_range_noise=self.seeker_range_noise,
             seeker_update_rate=self.seeker_update_rate,
+            seeker_track_alpha=self.seeker_track_alpha,
         )
         return interceptor, motor_res
 
