@@ -68,7 +68,11 @@ commands inside them directly.
 
 ## Web app
 
-The Python UI (`:8080`) and the React UI (`:5173`) expose the same tabs:
+The Python UI (`:8080`) opens on a plain-language **Start** tab made for
+non-experts: pick a ready-made scenario or move three everyday sliders, hit
+**Launch**, and get a plain-words verdict ("✓ Caught it!"), a 3D replay and a
+"what just happened?" explainer — the computer does the aiming. The full set of
+engineering tabs (shared with the React UI at `:5173`):
 
 - **Interception** — configure interceptor + target, run the engagement, or hit
   **Auto-aim** to compute the firing solution; see an **animated 3D replay** of

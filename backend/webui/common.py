@@ -28,6 +28,7 @@ PALETTE = {
 }
 
 NAV = [
+    ("/start", "Start", "play_circle"),
     ("/", "Interception", "gps_fixed"),
     ("/motor", "Motor", "local_fire_department"),
     ("/stack", "Multi-stage", "layers"),
