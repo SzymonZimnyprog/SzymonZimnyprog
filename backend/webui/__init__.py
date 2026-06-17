@@ -17,6 +17,7 @@ from . import (  # noqa: F401
     missile_page,
     motor_page,
     stack_page,
+    studio_page,
 )
 
 

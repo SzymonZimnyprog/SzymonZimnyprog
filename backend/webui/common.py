@@ -32,6 +32,7 @@ NAV = [
     ("/motor", "Motor", "local_fire_department"),
     ("/stack", "Multi-stage", "layers"),
     ("/trajectory", "Trajectory", "show_chart"),
+    ("/studio", "Studio", "tune"),
     ("/items", "Items", "list"),
 ]
 
@@ -500,6 +501,52 @@ def bar_fig(
         template="plotly_white",
         height=height,
         margin=dict(l=60, r=20, t=20, b=45),
+        font=dict(family="Inter, sans-serif"),
+    )
+    return fig
+
+
+def heatmap_fig(
+    values_x: list,
+    values_y: list,
+    z: list[list[float]],
+    xlabel: str,
+    ylabel: str,
+    metric: str,
+    *,
+    height: int = 420,
+) -> go.Figure:
+    fig = go.Figure(
+        go.Heatmap(
+            x=values_x, y=values_y, z=z, colorscale="Viridis",
+            colorbar=dict(title=metric),
+        )
+    )
+    fig.update_layout(
+        xaxis_title=xlabel, yaxis_title=ylabel, template="plotly_white",
+        height=height, margin=dict(l=70, r=20, t=20, b=50),
+        font=dict(family="Inter, sans-serif"),
+    )
+    return fig
+
+
+def tornado_fig(
+    rows: list[dict], baseline: float, metric: str, *, height: int = 320
+) -> go.Figure:
+    """Horizontal tornado: each parameter's metric swing about the baseline."""
+    rows = list(reversed(rows))  # largest swing on top
+    params = [r["parameter"] for r in rows]
+    lows = [r["low"] - baseline for r in rows]
+    highs = [r["high"] - baseline for r in rows]
+    fig = go.Figure()
+    fig.add_trace(go.Bar(y=params, x=lows, orientation="h", name="−Δ param",
+                         marker_color=PALETTE["sky"]))
+    fig.add_trace(go.Bar(y=params, x=highs, orientation="h", name="+Δ param",
+                         marker_color=PALETTE["amber"]))
+    fig.update_layout(
+        barmode="overlay", template="plotly_white", height=height,
+        xaxis_title=f"Δ {metric} from baseline", margin=dict(l=160, r=20, t=20, b=45),
+        legend=dict(orientation="h", yanchor="bottom", y=1.0, x=0),
         font=dict(family="Inter, sans-serif"),
     )
     return fig

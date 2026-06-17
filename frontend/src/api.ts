@@ -333,6 +333,76 @@ export interface MotorSweepRequest {
 export const sweepMotor = (req: MotorSweepRequest) =>
   postJson<MotorSweepResult>("/motor/sweep", req);
 
+// --- design studio: optimisation, heatmaps, sensitivity ------------------- //
+export interface MotorOptimizeRequest {
+  base: MotorRequest;
+  parameter: string;
+  metric: string;
+  target: number;
+  lower: number;
+  upper: number;
+}
+
+export interface MotorOptimizeResult {
+  parameter: string;
+  metric: string;
+  target: number;
+  value: number;
+  achieved: number;
+  summary: MotorResult["summary"];
+}
+
+export const optimizeMotor = (req: MotorOptimizeRequest) =>
+  postJson<MotorOptimizeResult>("/motor/optimize", req);
+
+export interface MotorSweep2DRequest {
+  base: MotorRequest;
+  param_x: string;
+  param_y: string;
+  values_x: number[];
+  values_y: number[];
+  metric: string;
+}
+
+export interface MotorSweep2DResult {
+  param_x: string;
+  param_y: string;
+  values_x: number[];
+  values_y: number[];
+  metric: string;
+  z: number[][];
+}
+
+export const sweepMotor2D = (req: MotorSweep2DRequest) =>
+  postJson<MotorSweep2DResult>("/motor/sweep2d", req);
+
+export interface SensitivityResult {
+  metric: string;
+  baseline: number;
+  delta: number;
+  rows: { parameter: string; low: number; high: number; swing: number }[];
+}
+
+export const motorSensitivity = (req: {
+  base?: MotorRequest;
+  parameters?: string[];
+  metric: string;
+  delta: number;
+}) => postJson<SensitivityResult>("/motor/sensitivity", req);
+
+export interface LaunchOptimizeResult extends TrajectoryResult {
+  elevation_deg: number;
+  objective: string;
+  objective_value: number;
+}
+
+export const optimizeLaunch = (req: {
+  missile?: MissileRequest;
+  objective: string;
+  elevation_lower?: number;
+  elevation_upper?: number;
+}) => postJson<LaunchOptimizeResult>("/missile/optimize_launch", req);
+
 export interface Stage {
   motor: MotorRequest;
   ignition_delay: number;

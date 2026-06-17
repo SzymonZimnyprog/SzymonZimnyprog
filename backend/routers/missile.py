@@ -14,6 +14,7 @@ from backend.sim.models import (
 )
 from backend.sim.motor import simulate_motor
 from backend.sim.multistage import staged_thrust
+from backend.sim.optimize import golden_section_maximize
 from backend.sim.stability import barrowman_stability
 
 router = APIRouter()
@@ -75,6 +76,49 @@ def simulate(req: MissileRequest):
     )
     out = traj.as_dict()
     out["motor_summary"] = motor_res.as_dict()["summary"]
+    return out
+
+
+class LaunchOptimizeRequest(BaseModel):
+    missile: MissileRequest = MissileRequest()
+    objective: str = Field("apogee", description="apogee | range")
+    elevation_lower: float = Field(20.0, ge=0, le=90)
+    elevation_upper: float = Field(89.0, ge=0, le=90)
+
+
+@router.post("/optimize_launch")
+def optimize_launch(req: LaunchOptimizeRequest):
+    """Find the launch elevation that maximises apogee or downrange range.
+
+    The motor and airframe are fixed; only the launch elevation is varied, so
+    the thrust curve is built once and reused across the search.
+    """
+    vehicle, curve, motor_res = build_vehicle_and_curve(
+        req.missile.motor, req.missile.airframe
+    )
+    key = "apogee" if req.objective == "apogee" else "range"
+
+    def fly(elevation: float):
+        vel = launch_velocity(req.missile.launch_speed, elevation,
+                              req.missile.azimuth_deg)
+        return propagate(
+            vehicle, launch_position=np.zeros(3), launch_velocity=vel,
+            propellant_mass=curve.propellant_mass_initial,
+            dt=req.missile.dt, max_time=req.missile.max_time,
+        )
+
+    def objective(elevation: float) -> float:
+        return fly(elevation).as_dict()["summary"][key]
+
+    best_el = golden_section_maximize(
+        objective, req.elevation_lower, req.elevation_upper, iters=28
+    )
+    traj = fly(best_el)
+    out = traj.as_dict()
+    out["motor_summary"] = motor_res.as_dict()["summary"]
+    out["elevation_deg"] = best_el
+    out["objective"] = req.objective
+    out["objective_value"] = out["summary"][key]
     return out
 
 
