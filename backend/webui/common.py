@@ -554,6 +554,58 @@ def tornado_fig(
     return fig
 
 
+def nozzle_section_fig(geo: dict, *, height: int = 320) -> go.Figure:
+    """Axisymmetric cross-section of the chamber + converging-diverging nozzle.
+
+    The grain (propellant) is shaded in the chamber with its central port; the
+    nozzle wall is the gas-side contour, mirrored about the axis. Equal aspect
+    so the proportions are true to the sizing.
+    """
+    xs = geo["profile_x"]
+    rs = geo["profile_r"]
+    rc = geo["chamber_radius"]
+    rcore = geo["core_radius"]
+    lch = geo["chamber_length"]
+
+    fig = go.Figure()
+    # Propellant grain (annulus between port and chamber wall), both halves.
+    if rcore < rc:
+        for sign in (1, -1):
+            fig.add_shape(
+                type="rect", x0=0, x1=lch,
+                y0=sign * rcore, y1=sign * rc,
+                fillcolor="rgba(99,102,241,0.18)",
+                line=dict(color=PALETTE["indigo"], width=1),
+            )
+    # Nozzle/chamber wall contour (gas-side), upper and lower.
+    fig.add_trace(go.Scatter(
+        x=xs, y=rs, mode="lines", line=dict(color=PALETTE["slate"], width=3),
+        name="wall", showlegend=False))
+    fig.add_trace(go.Scatter(
+        x=xs, y=[-r for r in rs], mode="lines",
+        line=dict(color=PALETTE["slate"], width=3), showlegend=False))
+    # Centre line.
+    fig.add_trace(go.Scatter(
+        x=[0, geo["x_exit"]], y=[0, 0], mode="lines",
+        line=dict(color=PALETTE["slate"], width=1, dash="dot"), showlegend=False))
+    # Throat & exit annotations.
+    fig.add_annotation(x=geo["x_throat"], y=geo["throat_radius"],
+                       text=f"throat Ø{geo['throat_diameter'] * 1000:.1f} mm",
+                       showarrow=True, arrowhead=2, ay=-30)
+    fig.add_annotation(x=geo["x_exit"], y=geo["exit_radius"],
+                       text=f"exit Ø{geo['exit_diameter'] * 1000:.1f} mm "
+                            f"(ε={geo['expansion_ratio']:.1f})",
+                       showarrow=True, arrowhead=2, ay=-30)
+    fig.update_layout(
+        template="plotly_white", height=height,
+        margin=dict(l=20, r=20, t=20, b=40), showlegend=False,
+        xaxis_title="Axial position (m)",
+        yaxis=dict(scaleanchor="x", scaleratio=1, title="Radius (m)"),
+        font=dict(family="Inter, sans-serif"),
+    )
+    return fig
+
+
 def plot(fig: go.Figure) -> ui.plotly:
     """Render a Plotly figure full-width with a clean toolbar."""
     fig.update_layout(modebar=dict(orientation="v"))

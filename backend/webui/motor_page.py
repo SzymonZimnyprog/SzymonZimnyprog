@@ -6,6 +6,7 @@ from nicegui import run, ui
 
 from backend.routers import export as export_router
 from backend.routers.motor import simulate as motor_simulate
+from backend.sim.geometry import nozzle_profile
 from backend.sim.models import MotorRequest, PropellantModel
 from backend.sim.propellant import PRESETS
 
@@ -15,6 +16,7 @@ from .common import (
     card,
     header,
     line_fig,
+    nozzle_section_fig,
     num,
     offer_download,
     page_body,
@@ -163,6 +165,28 @@ def motor_page() -> None:
                 )
             )
 
+            # Geometric cross-section reflecting the nozzle/grain sizing.
+            ui.label("Nozzle & grain geometry").classes("font-semibold mt-2")
+            g = state["grain"]
+            geo = nozzle_profile(
+                throat_diameter=state["nozzle"]["throat_diameter"],
+                expansion_ratio=state["nozzle"]["expansion_ratio"],
+                chamber_diameter=g["outer_diameter"],
+                grain_length=g["segment_length"] * g["segments"],
+                core_diameter=g["core_diameter"],
+            )
+            plot(nozzle_section_fig(geo))
+            noz_len = (geo["converging_length"] + geo["diverging_length"]) * 1000
+            ui.label(
+                f"Throat Ø{geo['throat_diameter'] * 1000:.1f} mm · "
+                f"exit Ø{geo['exit_diameter'] * 1000:.1f} mm · "
+                f"ε={geo['expansion_ratio']:.1f} · "
+                f"nozzle length {noz_len:.0f} mm (15° divergent). "
+                "Export the exact solid via the buttons below."
+            ).classes("text-xs text-slate-500")
+
+            _intercept_workflow()
+
             ui.label("Export").classes("font-semibold mt-2")
             req = MotorRequest.model_validate(state)
             with ui.row().classes("flex-wrap gap-2"):
@@ -176,6 +200,40 @@ def motor_page() -> None:
                 _export_btn("motor.eng", export_router.motor_eng_export, req)
 
     run_btn.on_click(run_motor)
+
+
+def _intercept_workflow() -> None:
+    """Explain how a sized motor becomes an actual aimed interception."""
+    with ui.expansion(
+        "From this design to an actual intercept", icon="route"
+    ).classes("w-full mt-2"):
+        steps = [
+            ("Size & check", "Tune the motor here until thrust, chamber "
+             "pressure and impulse are healthy (no warnings). Export the STL/"
+             "OpenSCAD if you're building it."),
+            ("Confirm stability", "On the Trajectory tab, open Stability "
+             "(Barrowman) and keep the static margin at 1–2 calibers across the "
+             "whole burn — an unstable airframe can't be guided."),
+            ("Load it as the interceptor", "On the Interception tab this same "
+             "motor is the interceptor's Boost motor; set the target's position "
+             "and velocity."),
+            ("Auto-aim = the firing solution", "Press Auto-aim: the solver "
+             "searches the launch elevation and azimuth that intercept, and "
+             "returns that firing solution plus the launch envelope. Those two "
+             "angles ARE how you physically point the launcher."),
+            ("Guidance flies the rest", "After launch the seeker acquires the "
+             "target and proportional navigation (PN/APN) steers the missile to "
+             "closest approach — you aim the launcher, the guidance law does the "
+             "in-flight homing."),
+        ]
+        for i, (title, body) in enumerate(steps, 1):
+            with ui.row().classes("items-start gap-2 no-wrap"):
+                ui.label(f"{i}").classes(
+                    "text-white bg-primary rounded-full w-6 h-6 "
+                    "flex items-center justify-center text-sm shrink-0")
+                with ui.column().classes("gap-0"):
+                    ui.label(title).classes("font-semibold text-sm")
+                    ui.label(body).classes("text-xs text-slate-500")
 
 
 def _export_btn(filename: str, fn, req) -> None:
