@@ -155,6 +155,26 @@ STAGE = {
     "exactly the staging benefit.",
 }
 
+# Stability (Barrowman) ----------------------------------------------------- #
+STABILITY = {
+    "nose_type": "Nose-cone shape: ogive (most common), cone, parabolic or "
+    "haack. Affects where the nose's centre of pressure sits.",
+    "fin_root_chord": "Fin chord at the body (m). Bigger fins → CP moves aft → "
+    "more stability.",
+    "fin_tip_chord": "Fin chord at the tip (m). 0 = a triangular (delta) fin.",
+    "fin_span": "Exposed fin semi-span (m), body surface to tip. The strongest "
+    "lever on stability — larger span pushes CP aft.",
+    "fin_sweep": "Leading-edge sweep distance (m): how far back the tip LE is "
+    "from the root LE. Cosmetic for stability, matters for flutter.",
+    "dry_cg": "Empty centre of gravity from the nose tip (m). Find it by "
+    "balancing the unloaded rocket. Leave blank for an estimate (~0.55·L).",
+    "propellant_cg": "Loaded propellant CG from the nose tip (m). Usually well "
+    "aft (in the motor). Blank ≈ 0.85·L.",
+    "static_margin": "CP-to-CG distance in calibers (body diameters). Aim for "
+    "1–2 cal stable across the whole burn: <1 risks instability, >2.5 "
+    "weathercocks into wind. CG moves as propellant burns, so check both ends.",
+}
+
 # Payload (stack flight) ---------------------------------------------------- #
 PAYLOAD = {
     "dry_mass": "Payload/bus mass (kg) carried by the top stage and kept to "

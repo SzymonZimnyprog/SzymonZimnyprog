@@ -210,6 +210,42 @@ export const simulateMotor = (req: MotorRequest) =>
 export const simulateMissile = (req: MissileRequest) =>
   postJson<TrajectoryResult>("/missile/simulate", req);
 
+export interface StabilityRequest {
+  diameter: number;
+  nose_length: number;
+  body_length: number;
+  nose_type: string;
+  fin_count: number;
+  fin_root_chord: number;
+  fin_tip_chord: number;
+  fin_span: number;
+  fin_sweep: number;
+  fin_root_position?: number | null;
+  dry_mass: number;
+  dry_cg?: number | null;
+  propellant_mass: number;
+  propellant_cg?: number | null;
+}
+
+export interface StabilityResult {
+  x_cp: number;
+  x_cg_loaded: number;
+  x_cg_empty: number;
+  static_margin_loaded: number;
+  static_margin_empty: number;
+  cn_alpha: number;
+  cn_nose: number;
+  cn_fins: number;
+  x_cp_nose: number;
+  x_cp_fins: number;
+  body_length_total: number;
+  diameter: number;
+  warnings: string[];
+}
+
+export const analyzeStability = (req: StabilityRequest) =>
+  postJson<StabilityResult>("/missile/stability", req);
+
 export const simulateEngagement = (req: EngagementRequest) =>
   postJson<EngagementResult>("/engagement/simulate", req);
 

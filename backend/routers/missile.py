@@ -14,8 +14,50 @@ from backend.sim.models import (
 )
 from backend.sim.motor import simulate_motor
 from backend.sim.multistage import staged_thrust
+from backend.sim.stability import barrowman_stability
 
 router = APIRouter()
+
+
+class StabilityRequest(BaseModel):
+    diameter: float = Field(0.16, gt=0, description="body diameter, m")
+    nose_length: float = Field(0.6, gt=0, description="nose cone length, m")
+    body_length: float = Field(2.5, gt=0, description="body tube length, m")
+    nose_type: str = Field("ogive", description="ogive | cone | parabolic | haack")
+    fin_count: int = Field(4, ge=0, le=8)
+    fin_root_chord: float = Field(0.30, gt=0, description="fin root chord, m")
+    fin_tip_chord: float = Field(0.15, ge=0, description="fin tip chord, m")
+    fin_span: float = Field(0.12, gt=0, description="exposed semi-span, m")
+    fin_sweep: float = Field(0.10, ge=0, description="LE sweep distance, m")
+    fin_root_position: float | None = Field(
+        None, description="nose-tip to fin-root LE, m (default: tail)"
+    )
+    dry_mass: float = Field(40.0, gt=0, description="empty mass, kg")
+    dry_cg: float | None = Field(None, description="empty CG from nose tip, m")
+    propellant_mass: float = Field(8.0, ge=0, description="loaded propellant, kg")
+    propellant_cg: float | None = Field(None, description="propellant CG, m")
+
+
+@router.post("/stability")
+def stability(req: StabilityRequest):
+    """Barrowman centre of pressure, CG and static margin (loaded & burnout)."""
+    res = barrowman_stability(
+        diameter=req.diameter,
+        nose_length=req.nose_length,
+        body_length=req.body_length,
+        nose_type=req.nose_type,
+        fin_count=req.fin_count,
+        fin_root_chord=req.fin_root_chord,
+        fin_tip_chord=req.fin_tip_chord,
+        fin_span=req.fin_span,
+        fin_sweep=req.fin_sweep,
+        fin_root_position=req.fin_root_position,
+        dry_mass=req.dry_mass,
+        dry_cg=req.dry_cg,
+        propellant_mass=req.propellant_mass,
+        propellant_cg=req.propellant_cg,
+    )
+    return res.as_dict()
 
 
 @router.post("/simulate")

@@ -61,3 +61,50 @@ def test_multistage_flight_stages_and_drops_mass():
     sep = data["separations"][0]
     assert sep["mass_after"] < data["initial_mass"]
 
+
+
+# --- aerodynamic stability (Barrowman) ------------------------------------ #
+def test_stability_typical_finned_rocket_is_stable():
+    from backend.sim.stability import barrowman_stability
+
+    res = barrowman_stability(
+        diameter=0.16, nose_length=0.6, body_length=2.5,
+        fin_count=4, fin_root_chord=0.30, fin_tip_chord=0.15,
+        fin_span=0.18, fin_sweep=0.12,
+        dry_mass=40.0, dry_cg=1.6, propellant_mass=8.0, propellant_cg=2.7,
+    )
+    # CP must sit behind both CGs for positive static margin
+    assert res.x_cp > res.x_cg_loaded
+    assert res.static_margin_loaded > 0.0
+    assert res.cn_fins > 0.0
+
+
+def test_stability_cone_cp_is_aft_of_ogive():
+    from backend.sim.stability import barrowman_stability
+
+    common = dict(diameter=0.16, nose_length=0.6, body_length=2.5, fin_count=0)
+    ogive = barrowman_stability(nose_type="ogive", **common)
+    cone = barrowman_stability(nose_type="cone", **common)
+    assert cone.x_cp_nose > ogive.x_cp_nose
+
+
+def test_stability_no_fins_warns():
+    from backend.sim.stability import barrowman_stability
+
+    res = barrowman_stability(
+        diameter=0.16, nose_length=0.6, body_length=2.5, fin_count=0,
+        dry_mass=40.0,
+    )
+    assert any("unstable" in w.lower() for w in res.warnings)
+
+
+def test_stability_endpoint():
+    payload = {
+        "diameter": 0.16, "nose_length": 0.6, "body_length": 2.5,
+        "fin_count": 4, "fin_span": 0.18, "dry_cg": 1.6,
+        "propellant_mass": 8.0, "propellant_cg": 2.7,
+    }
+    data = client.post("/api/missile/stability", json=payload).json()
+    assert "static_margin_loaded" in data
+    assert data["x_cp"] > 0
+    assert data["cn_alpha"] > 2.0  # nose (2) + fins

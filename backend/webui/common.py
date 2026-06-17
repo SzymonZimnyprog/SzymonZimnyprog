@@ -457,6 +457,39 @@ def animated_path3d_fig(
     return fig
 
 
+def stability_fig(res: dict, *, height: int = 220) -> go.Figure:
+    """Horizontal schematic of the airframe with CP and CG marked."""
+    total = res["body_length_total"]
+    d = res["diameter"]
+    fig = go.Figure()
+    # body as a rounded bar centred on y=0
+    fig.add_shape(type="rect", x0=0, x1=total, y0=-d / 2, y1=d / 2,
+                  fillcolor="rgba(99,102,241,0.10)", line=dict(color=PALETTE["indigo"]))
+    pts = [
+        ("CP", res["x_cp"], PALETTE["indigo"], "triangle-down", "top center"),
+        ("CG loaded", res["x_cg_loaded"], PALETTE["green"], "circle", "top center"),
+        ("CG empty", res["x_cg_empty"], PALETTE["amber"], "circle-open",
+         "bottom center"),
+    ]
+    for label, x, color, symbol, textpos in pts:
+        fig.add_trace(
+            go.Scatter(
+                x=[x], y=[0], mode="markers+text", name=label, text=[label],
+                textposition=textpos,
+                marker=dict(size=14, color=color, symbol=symbol,
+                            line=dict(color="white", width=1)),
+            )
+        )
+    fig.update_layout(
+        template="plotly_white", height=height,
+        margin=dict(l=10, r=10, t=10, b=30), showlegend=False,
+        xaxis_title="Position from nose tip (m)",
+        yaxis=dict(visible=False, range=[-total * 0.12, total * 0.18]),
+        font=dict(family="Inter, sans-serif"),
+    )
+    return fig
+
+
 def bar_fig(
     xlabel: str, ylabel: str, x: list, y: list, *, height: int = 320
 ) -> go.Figure:

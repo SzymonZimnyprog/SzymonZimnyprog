@@ -8,7 +8,9 @@ from nicegui import run, ui
 
 from backend.routers import export as export_router
 from backend.routers.export import AirframeCadRequest
+from backend.routers.missile import StabilityRequest
 from backend.routers.missile import simulate as missile_simulate
+from backend.routers.missile import stability as stability_endpoint
 from backend.sim.models import MissileRequest
 
 from . import help_text as H
@@ -23,7 +25,10 @@ from .common import (
     page_body,
     page_intro,
     plot,
+    select_field,
+    stability_fig,
     stats_row,
+    warnings_panel,
     xy_fig,
 )
 from .motor_page import motor_form
@@ -75,6 +80,8 @@ def trajectory_page() -> None:
                 run_btn = ui.button("Fly missile", icon="rocket_launch").classes(
                     "w-full mt-2"
                 )
+
+                _stability_section(state, cad)
 
             results = ui.column().classes("flex-grow gap-3 min-w-[420px]")
 
@@ -156,6 +163,75 @@ def trajectory_page() -> None:
                      "airframe.scad")
 
     run_btn.on_click(run_flight)
+
+
+def _stability_section(state: dict, cad: dict) -> None:
+    total = cad["nose_length"] + cad["body_length"]
+    stab = {
+        "diameter": state["airframe"]["diameter"],
+        "nose_length": cad["nose_length"],
+        "body_length": cad["body_length"],
+        "nose_type": "ogive",
+        "fin_count": cad["fin_count"],
+        "fin_root_chord": cad["fin_root"],
+        "fin_tip_chord": round(cad["fin_root"] * 0.5, 3),
+        "fin_span": cad["fin_span"],
+        "fin_sweep": round(cad["fin_root"] * 0.4, 3),
+        "fin_root_position": None,
+        "dry_mass": state["airframe"]["dry_mass"],
+        "dry_cg": round(0.55 * total, 3),
+        "propellant_mass": 8.0,
+        "propellant_cg": round(0.85 * total, 3),
+    }
+
+    with ui.expansion("Stability (Barrowman)", icon="balance").classes("w-full"):
+        ui.label(
+            "Centre of pressure vs centre of gravity → static margin. "
+            "Aim for 1–2 calibers across the whole burn."
+        ).classes("text-xs text-slate-500")
+        select_field(stab, "nose_type", "Nose type",
+                     ["ogive", "cone", "parabolic", "haack"],
+                     help=H.STABILITY["nose_type"])
+        with ui.grid(columns=2).classes("gap-2 w-full"):
+            num(stab, "fin_root_chord", "Fin root chord", unit="m", step=0.01,
+                help=H.STABILITY["fin_root_chord"])
+            num(stab, "fin_tip_chord", "Fin tip chord", unit="m", step=0.01,
+                help=H.STABILITY["fin_tip_chord"])
+            num(stab, "fin_span", "Fin span", unit="m", step=0.01,
+                help=H.STABILITY["fin_span"])
+            num(stab, "fin_sweep", "Fin sweep", unit="m", step=0.01,
+                help=H.STABILITY["fin_sweep"])
+            num(stab, "dry_cg", "Empty CG", unit="m", step=0.05,
+                help=H.STABILITY["dry_cg"])
+            num(stab, "propellant_mass", "Prop mass", unit="kg", step=1)
+            num(stab, "propellant_cg", "Prop CG", unit="m", step=0.05,
+                help=H.STABILITY["propellant_cg"])
+        out = ui.column().classes("w-full gap-2")
+
+        def analyse() -> None:
+            out.clear()
+            try:
+                res = stability_endpoint(StabilityRequest.model_validate(stab))
+            except Exception as exc:  # noqa: BLE001
+                ui.notify(str(exc), type="negative")
+                return
+            with out:
+                ml, me = res["static_margin_loaded"], res["static_margin_empty"]
+                stats_row(
+                    [
+                        ("Margin loaded", f"{ml:.2f} cal"),
+                        ("Margin empty", f"{me:.2f} cal"),
+                        ("CP", f"{res['x_cp']:.2f} m"),
+                        ("CG loaded", f"{res['x_cg_loaded']:.2f} m"),
+                        ("CNα", f"{res['cn_alpha']:.1f}/rad"),
+                    ]
+                )
+                plot(stability_fig(res))
+                warnings_panel(res["warnings"])
+
+        ui.button("Analyse stability", icon="balance", on_click=analyse).props(
+            "outline no-caps"
+        ).classes("w-full")
 
 
 def _btn(label: str, fn, filename: str) -> None:
