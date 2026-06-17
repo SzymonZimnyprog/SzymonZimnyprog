@@ -338,6 +338,7 @@ def animated_path3d_fig(
         return int(round(f * (len(s["x"]) - 1)))
 
     def traces_at(f: float) -> list[go.Scatter3d]:
+        # The animated traces: a bold growing trail + a large moving head per path.
         data = []
         for s in ds:
             j = head(s, f)
@@ -345,14 +346,15 @@ def animated_path3d_fig(
                 go.Scatter3d(
                     x=s["x"][: j + 1], y=s["y"][: j + 1], z=s["z"][: j + 1],
                     mode="lines", name=s["label"],
-                    line=dict(color=s["color"], width=5),
+                    line=dict(color=s["color"], width=7),
                 )
             )
             data.append(
                 go.Scatter3d(
                     x=[s["x"][j]], y=[s["y"][j]], z=[s["z"][j]],
                     mode="markers", showlegend=False,
-                    marker=dict(size=6, color=s["color"]),
+                    marker=dict(size=9, color=s["color"],
+                                line=dict(color="white", width=1)),
                 )
             )
         return data
@@ -364,13 +366,23 @@ def animated_path3d_fig(
         ],
     )
 
-    # Static annotation markers (intercept point, stage separations).
+    # Static traces drawn AFTER the animated ones (frames only update indices
+    # 0..2N-1, so these stay put): a faint full-path reference per series, then
+    # the annotation markers (intercept point, stage separations).
+    for s in ds:
+        fig.add_trace(
+            go.Scatter3d(
+                x=s["x"], y=s["y"], z=s["z"], mode="lines", opacity=0.2,
+                line=dict(color=s["color"], width=2), showlegend=False,
+                hoverinfo="skip",
+            )
+        )
     for m in markers or []:
         fig.add_trace(
             go.Scatter3d(
                 x=[m["x"]], y=[m["y"]], z=[m["z"]], mode="markers+text",
                 text=[m["label"]], textposition="top center", showlegend=False,
-                marker=dict(size=7, color=m.get("color", PALETTE["red"]), symbol="x"),
+                marker=dict(size=8, color=m.get("color", PALETTE["red"]), symbol="x"),
             )
         )
 
@@ -399,7 +411,10 @@ def animated_path3d_fig(
             xaxis=dict(title="East (m)", range=_axis_range(allx)),
             yaxis=dict(title="North (m)", range=_axis_range(ally)),
             zaxis=dict(title="Up (m)", range=_axis_range(allz)),
-            aspectmode="data",
+            # A filled cube (not "data") so a near-planar engagement still spreads
+            # across the box instead of collapsing to an edge-on sliver.
+            aspectmode="cube",
+            camera=dict(eye=dict(x=1.6, y=1.5, z=0.9)),
         ),
         updatemenus=[
             dict(
