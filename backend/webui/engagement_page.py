@@ -24,13 +24,18 @@ from backend.routers.engagement import (
 )
 from backend.sim.models import EngagementRequest
 
+from . import help_text as H
 from .common import (
     PALETTE,
     bar_fig,
+    card,
     header,
     line_fig,
     num,
+    page_body,
     page_intro,
+    path3d_fig,
+    plot,
     stats_row,
     xy_fig,
 )
@@ -39,11 +44,16 @@ from .motor_page import motor_form
 AXES = ["E", "N", "Up"]
 
 
-def vec_inputs(label: str, vec: list, unit: str) -> None:
-    ui.label(f"{label} ({unit})").classes("text-sm font-medium mt-1")
+def vec_inputs(label: str, vec: list, unit: str, help: str = "") -> None:
+    with ui.row().classes("items-center gap-1 mt-1"):
+        ui.label(f"{label} ({unit})").classes("text-sm font-medium")
+        if help:
+            ui.icon("info").classes("text-primary text-sm").tooltip(help)
     with ui.grid(columns=3).classes("gap-2 w-full"):
         for i, axis in enumerate(AXES):
-            ui.number(label=axis, value=vec[i], step=10).classes("w-full").on(
+            field = ui.number(label=axis, value=vec[i], step=10)
+            field.props("outlined dense").classes("w-full")
+            field.on(
                 "update:model-value",
                 lambda e, idx=i: vec.__setitem__(idx, float(e.args or 0.0)),
             )
@@ -63,80 +73,100 @@ def engagement_page() -> None:
     }
     result: dict = {"mode": None, "data": None}
 
-    page_intro(
-        "Interception",
-        "Proportional-navigation homing against a ballistic target. Run a single "
-        "engagement, auto-aim the launch elevation/azimuth, fire a layered salvo, "
-        "or estimate kill probability under track uncertainty.",
-    )
+    with page_body():
+        page_intro(
+            "Interception",
+            "Proportional-navigation homing against a ballistic target. Run a single "
+            "engagement, auto-aim the launch elevation/azimuth, fire a layered salvo, "
+            "or estimate kill probability under track uncertainty.",
+        )
 
-    with ui.row().classes("w-full gap-4 no-wrap items-start"):
-        with ui.column().classes("w-[28rem] gap-2"):
-            interceptor = state["interceptor"]
-            target = state["target"]
+        with ui.row().classes("w-full gap-4 items-start"):
+            with ui.column().classes("w-[30rem] gap-2"):
+                interceptor = state["interceptor"]
+                target = state["target"]
 
-            with ui.card().classes("w-full"):
-                ui.label("Interceptor").classes("font-semibold")
-                with ui.expansion("Boost motor", icon="rocket").classes("w-full"):
-                    motor_form(interceptor["motor"])
-                ui.label("Airframe").classes("font-semibold mt-1")
-                with ui.grid(columns=3).classes("gap-2 w-full"):
-                    num(interceptor["airframe"], "diameter", "Dia", unit="m", step=0.01)
-                    num(interceptor["airframe"], "cd0", "Cd0", step=0.01)
-                    num(interceptor["airframe"], "dry_mass", "Dry", unit="kg", step=1)
-                vec_inputs("Launch position", interceptor["launch_position"], "m")
-                ui.label("Launch & guidance").classes("font-semibold mt-1")
-                with ui.grid(columns=2).classes("gap-2 w-full"):
-                    num(interceptor, "launch_speed", "Rail speed", unit="m/s", step=5)
-                    num(interceptor, "elevation_deg", "Elevation", unit="°", step=1,
-                        min=0, max=90)
-                    num(interceptor, "azimuth_deg", "Azimuth", unit="°", step=5)
-                    num(interceptor, "nav_constant", "Nav constant N", step=0.5)
-                    num(interceptor, "max_lateral_g", "Max lateral g", step=5)
-                    num(interceptor, "seeker_delay", "Seeker delay", unit="s", step=0.1)
+                with card("Interceptor", "rocket_launch").classes("w-full"):
+                    with ui.expansion("Boost motor", icon="local_fire_department"
+                                      ).classes("w-full"):
+                        motor_form(interceptor["motor"])
+                    ui.label("Airframe").classes("font-semibold mt-1")
+                    with ui.grid(columns=3).classes("gap-2 w-full"):
+                        num(interceptor["airframe"], "diameter", "Dia", unit="m",
+                            step=0.01, help=H.AIRFRAME["diameter"])
+                        num(interceptor["airframe"], "cd0", "Cd0", step=0.01,
+                            help=H.AIRFRAME["cd0"])
+                        num(interceptor["airframe"], "dry_mass", "Dry", unit="kg",
+                            step=1, help=H.AIRFRAME["dry_mass"])
+                    vec_inputs("Launch position", interceptor["launch_position"], "m",
+                               help=H.GUIDANCE["launch_position"])
+                    ui.label("Launch & guidance").classes("font-semibold mt-1")
+                    with ui.grid(columns=2).classes("gap-2 w-full"):
+                        num(interceptor, "launch_speed", "Rail speed", unit="m/s",
+                            step=5, help=H.LAUNCH["launch_speed"])
+                        num(interceptor, "elevation_deg", "Elevation", unit="°", step=1,
+                            min=0, max=90, help=H.LAUNCH["elevation_deg"])
+                        num(interceptor, "azimuth_deg", "Azimuth", unit="°", step=5,
+                            help=H.LAUNCH["azimuth_deg"])
+                        num(interceptor, "nav_constant", "Nav constant N", step=0.5,
+                            help=H.GUIDANCE["nav_constant"])
+                        num(interceptor, "max_lateral_g", "Max lateral g", step=5,
+                            help=H.GUIDANCE["max_lateral_g"])
+                        num(interceptor, "seeker_delay", "Seeker delay", unit="s",
+                            step=0.1, help=H.GUIDANCE["seeker_delay"])
 
-            with ui.card().classes("w-full"):
-                ui.label("Target").classes("font-semibold")
-                vec_inputs("Position", target["position"], "m")
-                vec_inputs("Velocity", target["velocity"], "m/s")
-                vec_inputs("Maneuver accel", target["maneuver_accel"], "m/s²")
-                with ui.grid(columns=3).classes("gap-2 w-full"):
-                    num(target, "diameter", "Dia", unit="m", step=0.05)
-                    num(target, "cd0", "Cd0", step=0.05)
-                    num(target, "mass", "Mass", unit="kg", step=10)
+                with card("Target", "adjust").classes("w-full"):
+                    vec_inputs("Position", target["position"], "m",
+                               help=H.TARGET["position"])
+                    vec_inputs("Velocity", target["velocity"], "m/s",
+                               help=H.TARGET["velocity"])
+                    vec_inputs("Maneuver accel", target["maneuver_accel"], "m/s²",
+                               help=H.TARGET["maneuver_accel"])
+                    with ui.grid(columns=3).classes("gap-2 w-full"):
+                        num(target, "diameter", "Dia", unit="m", step=0.05,
+                            help=H.TARGET["diameter"])
+                        num(target, "cd0", "Cd0", step=0.05, help=H.TARGET["cd0"])
+                        num(target, "mass", "Mass", unit="kg", step=10,
+                            help=H.TARGET["mass"])
 
-            with ui.card().classes("w-full"):
-                ui.label("Engagement").classes("font-semibold")
-                with ui.grid(columns=3).classes("gap-2 w-full"):
-                    num(state, "dt", "dt", unit="s", step=0.005)
-                    num(state, "max_time", "Max t", unit="s", step=10)
-                    num(state, "lethal_radius", "Lethal R", unit="m", step=1)
+                with card("Engagement", "tune").classes("w-full"):
+                    with ui.grid(columns=3).classes("gap-2 w-full"):
+                        num(state, "dt", "dt", unit="s", step=0.005,
+                            help=H.ENGAGEMENT["dt"])
+                        num(state, "max_time", "Max t", unit="s", step=10,
+                            help=H.ENGAGEMENT["max_time"])
+                        num(state, "lethal_radius", "Lethal R", unit="m", step=1,
+                            help=H.ENGAGEMENT["lethal_radius"])
 
-            with ui.row().classes("w-full gap-2 no-wrap"):
-                run_btn = ui.button("Engage").classes("flex-grow")
-                solve_btn = ui.button("Auto-aim").props("color=violet").classes(
-                    "flex-grow"
-                )
+                with ui.row().classes("w-full gap-2 no-wrap"):
+                    run_btn = ui.button("Engage", icon="play_arrow")
+                    run_btn.classes("flex-grow")
+                    solve_btn = ui.button("Auto-aim", icon="my_location")
+                    solve_btn.props("color=accent").classes("flex-grow")
 
-            with ui.card().classes("w-full"):
-                ui.label("Salvo").classes("font-semibold")
-                with ui.grid(columns=3).classes("gap-2 w-full"):
-                    num(extra, "salvo_count", "Shots", step=1, min=1, max=8)
-                    num(extra, "salvo_stagger", "Stagger", unit="s", step=0.5)
-                    num(extra, "salvo_spread", "Spread", unit="°", step=1)
-                salvo_btn = ui.button("Fire salvo").props("color=amber")
-                salvo_btn.classes("w-full")
+                with card("Salvo", "grain").classes("w-full"):
+                    with ui.grid(columns=3).classes("gap-2 w-full"):
+                        num(extra, "salvo_count", "Shots", step=1, min=1, max=8,
+                            help=H.SALVO["salvo_count"])
+                        num(extra, "salvo_stagger", "Stagger", unit="s", step=0.5,
+                            help=H.SALVO["salvo_stagger"])
+                        num(extra, "salvo_spread", "Spread", unit="°", step=1,
+                            help=H.SALVO["salvo_spread"])
+                    salvo_btn = ui.button("Fire salvo", icon="whatshot")
+                    salvo_btn.props("color=warning").classes("w-full")
 
-            with ui.card().classes("w-full"):
-                ui.label("Monte-Carlo Pk").classes("font-semibold")
-                with ui.grid(columns=3).classes("gap-2 w-full"):
-                    num(extra, "mc_trials", "Trials", step=10, min=10, max=1000)
-                    num(extra, "mc_pos_sigma", "σ pos", unit="m", step=25)
-                    num(extra, "mc_vel_sigma", "σ vel", unit="m/s", step=5)
-                mc_btn = ui.button("Run Monte-Carlo").props("color=sky")
-                mc_btn.classes("w-full")
+                with card("Monte-Carlo Pk", "casino").classes("w-full"):
+                    with ui.grid(columns=3).classes("gap-2 w-full"):
+                        num(extra, "mc_trials", "Trials", step=10, min=10, max=1000,
+                            help=H.SALVO["mc_trials"])
+                        num(extra, "mc_pos_sigma", "σ pos", unit="m", step=25,
+                            help=H.SALVO["mc_pos_sigma"])
+                        num(extra, "mc_vel_sigma", "σ vel", unit="m/s", step=5,
+                            help=H.SALVO["mc_vel_sigma"])
+                    mc_btn = ui.button("Run Monte-Carlo", icon="analytics")
+                    mc_btn.props("color=secondary").classes("w-full")
 
-        results = ui.column().classes("flex-grow gap-3")
+            results = ui.column().classes("flex-grow gap-3 min-w-[420px]")
 
     # ---- actions -------------------------------------------------------- #
     async def _run(btn, mode, fn, req):
@@ -231,63 +261,83 @@ def _render_engagement(mode: str, data: dict, state: dict) -> None:
     )
 
     launch = state["interceptor"]["launch_position"]
-    ig = _ground(eng["interceptor_position"], launch)
-    tg = _ground(eng["target_position"], launch)
-    markers = []
+    ipos = eng["interceptor_position"]
+    tpos = eng["target_position"]
+    ig = _ground(ipos, launch)
+    tg = _ground(tpos, launch)
+    marker2d, marker3d = [], []
     if hit:
-        ip = eng["summary"]["intercept_point"]
-        markers = [
-            {
-                "x": math.hypot(ip[0] - launch[0], ip[1] - launch[1]),
-                "y": ip[2],
-                "label": "intercept",
-            }
-        ]
-    ui.plotly(
-        xy_fig(
-            "Ground range (m)",
-            "Altitude (m)",
-            [
-                {"label": "Interceptor", "color": PALETTE["indigo"],
-                 "x": ig, "y": [p[2] for p in eng["interceptor_position"]]},
-                {"label": "Target", "color": PALETTE["red"],
-                 "x": tg, "y": [p[2] for p in eng["target_position"]]},
-            ],
-            markers=markers,
-        )
-    ).classes("w-full")
-    ui.plotly(
-        line_fig(
-            "Time (s)",
-            "Separation (m)",
-            [{"label": "Separation", "color": PALETTE["slate"],
-              "x": eng["time"], "y": eng["separation"]}],
-        )
-    ).classes("w-full")
-    ui.plotly(
-        line_fig(
-            "Time (s)",
-            "Speed (m/s)",
-            [
-                {"label": "Interceptor", "color": PALETTE["indigo"],
-                 "x": eng["time"], "y": eng["interceptor_speed"]},
-                {"label": "Target", "color": PALETTE["red"],
-                 "x": eng["time"], "y": eng["target_speed"]},
-            ],
-        )
-    ).classes("w-full")
+        ip = s["intercept_point"]
+        marker2d = [{"x": math.hypot(ip[0] - launch[0], ip[1] - launch[1]),
+                     "y": ip[2], "label": "intercept"}]
+        marker3d = [{"x": ip[0], "y": ip[1], "z": ip[2], "label": "intercept"}]
 
-    if mode == "solve":
-        env = data["envelope"]
-        ui.plotly(
-            line_fig(
-                "Launch elevation (°)",
-                "Miss distance (m)",
-                [{"label": "Envelope", "color": PALETTE["violet"],
-                  "x": [e["elevation"] for e in env],
-                  "y": [e["miss"] for e in env]}],
+    with ui.tabs().classes("w-full") as tabs:
+        ui.tab("3D", icon="3d_rotation")
+        ui.tab("Profile", icon="show_chart")
+        ui.tab("Separation", icon="straighten")
+        ui.tab("Speed", icon="speed")
+        if mode == "solve":
+            ui.tab("Envelope", icon="radar")
+    with ui.tab_panels(tabs, value="3D").classes("w-full"):
+        with ui.tab_panel("3D"):
+            plot(
+                path3d_fig(
+                    [
+                        {"label": "Interceptor", "color": PALETTE["indigo"],
+                         "x": [p[0] for p in ipos], "y": [p[1] for p in ipos],
+                         "z": [p[2] for p in ipos]},
+                        {"label": "Target", "color": PALETTE["red"],
+                         "x": [p[0] for p in tpos], "y": [p[1] for p in tpos],
+                         "z": [p[2] for p in tpos]},
+                    ],
+                    markers=marker3d,
+                )
             )
-        ).classes("w-full")
+        with ui.tab_panel("Profile"):
+            plot(
+                xy_fig(
+                    "Ground range (m)", "Altitude (m)",
+                    [
+                        {"label": "Interceptor", "color": PALETTE["indigo"],
+                         "x": ig, "y": [p[2] for p in ipos]},
+                        {"label": "Target", "color": PALETTE["red"],
+                         "x": tg, "y": [p[2] for p in tpos]},
+                    ],
+                    markers=marker2d,
+                )
+            )
+        with ui.tab_panel("Separation"):
+            plot(
+                line_fig(
+                    "Time (s)", "Separation (m)",
+                    [{"label": "Separation", "color": PALETTE["slate"],
+                      "x": eng["time"], "y": eng["separation"]}],
+                )
+            )
+        with ui.tab_panel("Speed"):
+            plot(
+                line_fig(
+                    "Time (s)", "Speed (m/s)",
+                    [
+                        {"label": "Interceptor", "color": PALETTE["indigo"],
+                         "x": eng["time"], "y": eng["interceptor_speed"]},
+                        {"label": "Target", "color": PALETTE["red"],
+                         "x": eng["time"], "y": eng["target_speed"]},
+                    ],
+                )
+            )
+        if mode == "solve":
+            with ui.tab_panel("Envelope"):
+                env = data["envelope"]
+                plot(
+                    line_fig(
+                        "Launch elevation (°)", "Miss distance (m)",
+                        [{"label": "Envelope", "color": PALETTE["violet"],
+                          "x": [e["elevation"] for e in env],
+                          "y": [e["miss"] for e in env]}],
+                    )
+                )
 
 
 def _render_salvo(data: dict) -> None:
@@ -321,7 +371,7 @@ def _render_salvo(data: dict) -> None:
         }
         for sh in data["shots"]
     ]
-    ui.table(columns=columns, rows=rows).classes("w-full")
+    ui.table(columns=columns, rows=rows).classes("w-full sim-card")
 
 
 def _render_montecarlo(data: dict) -> None:
@@ -345,6 +395,4 @@ def _render_montecarlo(data: dict) -> None:
     centers = [
         f"{(edges[i] + edges[i + 1]) / 2:.0f}" for i in range(len(counts))
     ]
-    ui.plotly(
-        bar_fig("Miss distance (m)", "Trials", centers, counts)
-    ).classes("w-full")
+    plot(bar_fig("Miss distance (m)", "Trials", centers, counts))

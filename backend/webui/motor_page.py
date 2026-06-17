@@ -9,13 +9,18 @@ from backend.routers.motor import simulate as motor_simulate
 from backend.sim.models import MotorRequest, PropellantModel
 from backend.sim.propellant import PRESETS
 
+from . import help_text as H
 from .common import (
     PALETTE,
+    card,
     header,
     line_fig,
     num,
     offer_download,
+    page_body,
     page_intro,
+    plot,
+    select_field,
     stats_row,
     warnings_panel,
 )
@@ -29,7 +34,7 @@ def motor_form(state: dict) -> None:
     grain = state["grain"]
     nozzle = state["nozzle"]
 
-    with ui.row().classes("gap-1 flex-wrap"):
+    with ui.row().classes("gap-1 flex-wrap items-center"):
         ui.label("Propellant preset:").classes("self-center text-sm")
         for key in PRESETS:
             ui.button(
@@ -37,39 +42,54 @@ def motor_form(state: dict) -> None:
                 on_click=lambda k=key: state["propellant"].update(
                     PropellantModel.from_preset(k).model_dump(mode="json")
                 ),
-            ).props("dense outline")
+            ).props("dense outline no-caps").tooltip(
+                f"Load standard parameters for {key}"
+            )
 
     with ui.expansion("Propellant parameters", icon="science").classes("w-full"):
         with ui.grid(columns=2).classes("gap-2 w-full"):
-            num(prop, "a", "Burn-rate a", unit="mm/s@1MPa", step=0.1)
-            num(prop, "n", "Burn exponent n", step=0.01)
-            num(prop, "density", "Density", unit="kg/m³", step=10)
-            num(prop, "gamma", "γ (cp/cv)", step=0.01)
-            num(prop, "t_flame", "Flame temp", unit="K", step=50)
-            num(prop, "molar_mass", "Molar mass", unit="kg/mol", step=0.001)
-            num(prop, "c_star_eff", "c* efficiency", step=0.01)
+            num(prop, "a", "Burn-rate a", unit="mm/s@1MPa", step=0.1,
+                help=H.PROPELLANT["a"])
+            num(prop, "n", "Burn exponent n", step=0.01, help=H.PROPELLANT["n"])
+            num(prop, "density", "Density", unit="kg/m³", step=10,
+                help=H.PROPELLANT["density"])
+            num(prop, "gamma", "γ (cp/cv)", step=0.01, help=H.PROPELLANT["gamma"])
+            num(prop, "t_flame", "Flame temp", unit="K", step=50,
+                help=H.PROPELLANT["t_flame"])
+            num(prop, "molar_mass", "Molar mass", unit="kg/mol", step=0.001,
+                help=H.PROPELLANT["molar_mass"])
+            num(prop, "c_star_eff", "c* efficiency", step=0.01,
+                help=H.PROPELLANT["c_star_eff"])
 
     ui.label("Grain").classes("font-semibold mt-2")
-    ui.select(GRAIN_TYPES, value=grain["grain_type"], label="Grain type").classes(
-        "w-full"
-    ).bind_value(grain, "grain_type")
+    select_field(grain, "grain_type", "Grain type", GRAIN_TYPES,
+                 help=H.GRAIN["grain_type"])
     with ui.grid(columns=2).classes("gap-2 w-full"):
-        num(grain, "outer_diameter", "Outer dia", unit="m", step=0.005)
-        num(grain, "core_diameter", "Core dia", unit="m", step=0.005)
-        num(grain, "segment_length", "Segment len", unit="m", step=0.01)
-        num(grain, "segments", "Segments", step=1, min=1)
+        num(grain, "outer_diameter", "Outer dia", unit="m", step=0.005,
+            help=H.GRAIN["outer_diameter"])
+        num(grain, "core_diameter", "Core dia", unit="m", step=0.005,
+            help=H.GRAIN["core_diameter"])
+        num(grain, "segment_length", "Segment len", unit="m", step=0.01,
+            help=H.GRAIN["segment_length"])
+        num(grain, "segments", "Segments", step=1, min=1, help=H.GRAIN["segments"])
 
     ui.label("Nozzle").classes("font-semibold mt-2")
     with ui.grid(columns=2).classes("gap-2 w-full"):
-        num(nozzle, "throat_diameter", "Throat dia", unit="m", step=0.002)
-        num(nozzle, "expansion_ratio", "Expansion ratio Ae/At", step=0.5)
-        num(nozzle, "efficiency", "Nozzle efficiency", step=0.01)
+        num(nozzle, "throat_diameter", "Throat dia", unit="m", step=0.002,
+            help=H.NOZZLE["throat_diameter"])
+        num(nozzle, "expansion_ratio", "Expansion ratio Ae/At", step=0.5,
+            help=H.NOZZLE["expansion_ratio"])
+        num(nozzle, "efficiency", "Nozzle efficiency", step=0.01,
+            help=H.NOZZLE["efficiency"])
 
     with ui.expansion("Environment & solver", icon="tune").classes("w-full"):
         with ui.grid(columns=2).classes("gap-2 w-full"):
-            num(state, "altitude", "Altitude", unit="m", step=100)
-            num(state, "dt", "Time step", unit="s", step=0.001)
-            num(state, "max_time", "Max time", unit="s", step=5)
+            num(state, "altitude", "Altitude", unit="m", step=100,
+                help=H.MOTOR_ENV["altitude"])
+            num(state, "dt", "Time step", unit="s", step=0.001,
+                help=H.MOTOR_ENV["dt"])
+            num(state, "max_time", "Max time", unit="s", step=5,
+                help=H.MOTOR_ENV["max_time"])
 
 
 @ui.page("/motor")
@@ -78,19 +98,21 @@ def motor_page() -> None:
     state = MotorRequest().model_dump(mode="json")
     result: dict = {}
 
-    page_intro(
-        "Solid rocket motor",
-        "Quasi-steady internal ballistics: equilibrium chamber pressure, nozzle "
-        "thrust coefficient and the resulting thrust curve, with design "
-        "diagnostics and CAD / Simulink export.",
-    )
+    with page_body():
+        page_intro(
+            "Solid rocket motor",
+            "Quasi-steady internal ballistics: equilibrium chamber pressure, nozzle "
+            "thrust coefficient and the resulting thrust curve, with design "
+            "diagnostics and CAD / Simulink export.",
+        )
 
-    with ui.row().classes("w-full gap-4 no-wrap items-start"):
-        with ui.card().classes("w-96"):
-            motor_form(state)
-            run_btn = ui.button("Run motor").classes("w-full mt-2")
+        with ui.row().classes("w-full gap-4 items-start"):
+            with card().classes("w-96"):
+                motor_form(state)
+                run_btn = ui.button("Run motor", icon="play_arrow")
+                run_btn.classes("w-full mt-2")
 
-        results = ui.column().classes("flex-grow gap-3")
+            results = ui.column().classes("flex-grow gap-3 min-w-[420px]")
 
     async def run_motor() -> None:
         run_btn.props("loading")
@@ -124,22 +146,22 @@ def motor_page() -> None:
                 ]
             )
             warnings_panel(s["warnings"])
-            ui.plotly(
+            plot(
                 line_fig(
                     "Time (s)",
                     "Thrust (N)",
                     [{"label": "Thrust", "color": PALETTE["indigo"],
                       "x": result["time"], "y": result["thrust"]}],
                 )
-            ).classes("w-full")
-            ui.plotly(
+            )
+            plot(
                 line_fig(
                     "Time (s)",
                     "Chamber pressure (MPa)",
                     [{"label": "Pc", "color": PALETTE["red"], "x": result["time"],
                       "y": [p / 1e6 for p in result["chamber_pressure"]]}],
                 )
-            ).classes("w-full")
+            )
 
             ui.label("Export").classes("font-semibold mt-2")
             req = MotorRequest.model_validate(state)
@@ -163,4 +185,6 @@ def _export_btn(filename: str, fn, req) -> None:
         except Exception as exc:  # noqa: BLE001
             ui.notify(str(exc), type="negative")
 
-    ui.button(filename, on_click=handler).props("dense outline")
+    ui.button(filename, icon="download", on_click=handler).props(
+        "dense outline no-caps"
+    )

@@ -1,9 +1,10 @@
-"""Shared helpers for the NiceGUI web UI.
+"""Shared helpers, theming and Plotly figure builders for the NiceGUI web UI.
 
 The UI reuses the FastAPI router functions and the pure-Python simulation core
 directly (same process) — there is no duplicated request-handling logic. Heavy
 simulations are pushed off the event loop with ``run.io_bound`` so the UI stays
-responsive.
+responsive. Every input carries a hover tooltip explaining how to choose it
+(see :mod:`backend.webui.help_text`).
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ import plotly.graph_objects as go
 from fastapi import Response
 from nicegui import ui
 
+# Brand palette (indigo-forward, colour-blind-friendly accents).
 PALETTE = {
     "indigo": "#6366f1",
     "green": "#10b981",
@@ -26,46 +28,137 @@ PALETTE = {
 }
 
 NAV = [
-    ("/", "Interception"),
-    ("/motor", "Motor"),
-    ("/stack", "Multi-stage"),
-    ("/trajectory", "Trajectory"),
-    ("/items", "Items"),
+    ("/", "Interception", "gps_fixed"),
+    ("/motor", "Motor", "local_fire_department"),
+    ("/stack", "Multi-stage", "layers"),
+    ("/trajectory", "Trajectory", "show_chart"),
+    ("/items", "Items", "list"),
 ]
+
+_PLOT_CONFIG = {"displaylogo": False, "responsive": True}
+
+
+def apply_theme() -> None:
+    """Set brand colours, fonts and a little global CSS. Call once per page."""
+    ui.colors(
+        primary=PALETTE["indigo"],
+        secondary=PALETTE["sky"],
+        accent=PALETTE["violet"],
+        positive=PALETTE["green"],
+        negative=PALETTE["red"],
+        warning=PALETTE["amber"],
+    )
+    font = (
+        '<link rel="preconnect" href="https://fonts.googleapis.com">'
+        '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?'
+        'family=Inter:wght@400;500;600;700&display=swap">'
+    )
+    ui.add_head_html(
+        font
+        + """
+        <style>
+          body { font-family: 'Inter', system-ui, sans-serif; }
+          .sim-card { border: 1px solid rgba(99,102,241,.12);
+                      box-shadow: 0 1px 3px rgba(15,23,42,.06); border-radius: 14px; }
+          .sim-stat { transition: transform .12s ease; }
+          .sim-stat:hover { transform: translateY(-2px); }
+          .q-field--outlined .q-field__control { border-radius: 10px; }
+          .nicegui-content { padding: 0; }
+        </style>
+        """
+    )
 
 
 def header(active: str) -> None:
     """Shared top navigation bar; ``active`` is the current route path."""
-    with ui.header().classes("items-center justify-between bg-slate-800"):
-        ui.label("Interceptor & Solid-Motor Simulator").classes(
-            "text-lg font-semibold"
-        )
-        with ui.row().classes("gap-1"):
-            for path, label in NAV:
-                btn = ui.button(label, on_click=lambda p=path: ui.navigate.to(p))
-                flat = "" if path == active else "flat "
-                btn.props(f"{flat}dense color=white")
+    apply_theme()
+    dark = ui.dark_mode()
+    with ui.header(elevated=True).classes(
+        "items-center justify-between px-4 py-2"
+    ).style("background: linear-gradient(90deg,#312e81,#4f46e5);"):
+        with ui.row().classes("items-center gap-2 no-wrap"):
+            ui.icon("rocket_launch").classes("text-2xl")
+            ui.label("Interceptor & Solid-Motor Simulator").classes(
+                "text-lg font-semibold"
+            )
+        with ui.row().classes("items-center gap-1 no-wrap"):
+            for path, label, icon in NAV:
+                is_active = path == active
+                btn = ui.button(
+                    label, icon=icon, on_click=lambda p=path: ui.navigate.to(p)
+                )
+                # Active = outlined (visible white text + border on the gradient);
+                # inactive = flat. Both keep white text.
+                style = "outline" if is_active else "flat"
+                btn.props(f"{style} no-caps dense color=white").classes("rounded-lg")
+                if is_active:
+                    btn.classes("font-bold bg-white/10")
+            ui.button(icon="dark_mode", on_click=dark.toggle).props(
+                "flat round dense color=white"
+            ).tooltip("Toggle dark mode")
+
+
+def page_body():
+    """A centred, max-width column that holds a page's content."""
+    return ui.column().classes("w-full max-w-[1500px] mx-auto p-4 gap-3")
 
 
 def page_intro(title: str, subtitle: str) -> None:
-    ui.label(title).classes("text-2xl font-bold mt-2")
-    ui.label(subtitle).classes("text-sm text-slate-500 mb-2 max-w-3xl")
+    ui.label(title).classes("text-2xl font-bold")
+    with ui.row().classes("items-start gap-2 max-w-4xl"):
+        ui.icon("info").classes("text-primary mt-1")
+        ui.label(
+            subtitle + "  Hover any field for guidance on how to choose it."
+        ).classes("text-sm text-slate-500")
+
+
+def card(title: str = "", icon: str = ""):
+    """A styled card; optionally with a titled header row."""
+    c = ui.card().classes("sim-card w-full p-4 gap-2")
+    if title:
+        with c:
+            with ui.row().classes("items-center gap-2"):
+                if icon:
+                    ui.icon(icon).classes("text-primary")
+                ui.label(title).classes("font-semibold text-base")
+    return c
 
 
 def num(
-    target: dict, key: str, label: str, *, unit: str = "", **kwargs: Any
+    target: dict,
+    key: str,
+    label: str,
+    *,
+    unit: str = "",
+    help: str = "",
+    **kwargs: Any,
 ) -> ui.number:
-    """A two-way-bound numeric input over a dict entry."""
+    """A two-way-bound numeric input over a dict entry, with a guidance tooltip."""
     text = f"{label} ({unit})" if unit else label
-    field = ui.number(label=text, value=target[key], **kwargs).classes("w-full")
+    field = ui.number(label=text, value=target[key], **kwargs)
+    field.props("outlined dense").classes("w-full")
     field.bind_value(target, key)
+    if help:
+        field.tooltip(help)
     return field
 
 
-def stat(label: str, value: str) -> None:
-    with ui.card().classes("p-3 items-center min-w-28"):
-        ui.label(value).classes("text-lg font-semibold")
-        ui.label(label).classes("text-xs text-slate-500")
+def select_field(
+    target: dict, key: str, label: str, options: list[str], *, help: str = ""
+) -> ui.select:
+    sel = ui.select(options, value=target[key], label=label)
+    sel.props("outlined dense").classes("w-full")
+    sel.bind_value(target, key)
+    if help:
+        sel.tooltip(help)
+    return sel
+
+
+def stat(label: str, value: str, *, color: str = "") -> None:
+    with ui.card().classes("sim-stat sim-card p-3 items-center min-w-28"):
+        cls = "text-xl font-bold" + (f" text-[{color}]" if color else "")
+        ui.label(value).classes(cls)
+        ui.label(label).classes("text-xs text-slate-500 text-center")
 
 
 def stats_row(items: Sequence[tuple[str, str]]) -> None:
@@ -74,25 +167,7 @@ def stats_row(items: Sequence[tuple[str, str]]) -> None:
             stat(label, value)
 
 
-def line_fig(
-    xlabel: str,
-    ylabel: str,
-    series: list[dict],
-    *,
-    height: int = 340,
-) -> go.Figure:
-    """Build a Plotly line figure from ``{label, color, x, y}`` series."""
-    fig = go.Figure()
-    for s in series:
-        fig.add_trace(
-            go.Scatter(
-                x=s["x"],
-                y=s["y"],
-                mode="lines",
-                name=s["label"],
-                line=dict(color=s.get("color", PALETTE["indigo"]), width=2),
-            )
-        )
+def _layout(fig: go.Figure, xlabel: str, ylabel: str, height: int) -> None:
     fig.update_layout(
         xaxis_title=xlabel,
         yaxis_title=ylabel,
@@ -100,7 +175,24 @@ def line_fig(
         height=height,
         margin=dict(l=60, r=20, t=20, b=45),
         legend=dict(orientation="h", yanchor="bottom", y=1.0, x=0),
+        hovermode="x unified",
+        font=dict(family="Inter, sans-serif"),
     )
+
+
+def line_fig(
+    xlabel: str, ylabel: str, series: list[dict], *, height: int = 320
+) -> go.Figure:
+    """Build a Plotly line figure from ``{label, color, x, y}`` series."""
+    fig = go.Figure()
+    for s in series:
+        fig.add_trace(
+            go.Scatter(
+                x=s["x"], y=s["y"], mode="lines", name=s["label"],
+                line=dict(color=s.get("color", PALETTE["indigo"]), width=2.5),
+            )
+        )
+    _layout(fig, xlabel, ylabel, height)
     return fig
 
 
@@ -118,35 +210,72 @@ def xy_fig(
     for s in series:
         fig.add_trace(
             go.Scatter(
-                x=s["x"],
-                y=s["y"],
-                mode="lines",
-                name=s["label"],
-                line=dict(color=s.get("color", PALETTE["indigo"]), width=2),
+                x=s["x"], y=s["y"], mode="lines", name=s["label"],
+                line=dict(color=s.get("color", PALETTE["indigo"]), width=2.5),
             )
         )
     for m in markers or []:
         fig.add_trace(
             go.Scatter(
-                x=[m["x"]],
-                y=[m["y"]],
-                mode="markers+text",
-                text=[m["label"]],
+                x=[m["x"]], y=[m["y"]], mode="markers+text", text=[m["label"]],
                 textposition="top center",
-                marker=dict(color=m.get("color", PALETTE["red"]), size=10, symbol="x"),
+                marker=dict(color=m.get("color", PALETTE["red"]), size=11, symbol="x"),
+                showlegend=False,
+            )
+        )
+    _layout(fig, xlabel, ylabel, height)
+    fig.update_layout(hovermode="closest")
+    if equal_aspect:
+        fig.update_yaxes(scaleanchor="x", scaleratio=1)
+    return fig
+
+
+def path3d_fig(
+    series: list[dict],
+    markers: list[dict] | None = None,
+    *,
+    height: int = 480,
+) -> go.Figure:
+    """Interactive 3D trajectory plot. Series carry x (E), y (N), z (Up)."""
+    fig = go.Figure()
+    for s in series:
+        fig.add_trace(
+            go.Scatter3d(
+                x=s["x"], y=s["y"], z=s["z"], mode="lines", name=s["label"],
+                line=dict(color=s.get("color", PALETTE["indigo"]), width=5),
+            )
+        )
+        # mark the start point of each path
+        if s["x"]:
+            fig.add_trace(
+                go.Scatter3d(
+                    x=[s["x"][0]], y=[s["y"][0]], z=[s["z"][0]], mode="markers",
+                    marker=dict(size=4, color=s.get("color", PALETTE["indigo"])),
+                    showlegend=False,
+                )
+            )
+    for m in markers or []:
+        fig.add_trace(
+            go.Scatter3d(
+                x=[m["x"]], y=[m["y"]], z=[m["z"]], mode="markers+text",
+                text=[m["label"]], textposition="top center",
+                marker=dict(size=6, color=m.get("color", PALETTE["red"]), symbol="x"),
                 showlegend=False,
             )
         )
     fig.update_layout(
-        xaxis_title=xlabel,
-        yaxis_title=ylabel,
         template="plotly_white",
         height=height,
-        margin=dict(l=60, r=20, t=20, b=45),
+        margin=dict(l=0, r=0, t=10, b=0),
+        scene=dict(
+            xaxis_title="East (m)",
+            yaxis_title="North (m)",
+            zaxis_title="Up (m)",
+            aspectmode="data",
+        ),
         legend=dict(orientation="h", yanchor="bottom", y=1.0, x=0),
+        font=dict(family="Inter, sans-serif"),
     )
-    if equal_aspect:
-        fig.update_yaxes(scaleanchor="x", scaleratio=1)
     return fig
 
 
@@ -160,8 +289,16 @@ def bar_fig(
         template="plotly_white",
         height=height,
         margin=dict(l=60, r=20, t=20, b=45),
+        font=dict(family="Inter, sans-serif"),
     )
     return fig
+
+
+def plot(fig: go.Figure) -> ui.plotly:
+    """Render a Plotly figure full-width with a clean toolbar."""
+    fig.update_layout(modebar=dict(orientation="v"))
+    element = ui.plotly(fig).classes("w-full sim-card")
+    return element
 
 
 def offer_download(response: Response, filename: str) -> None:
@@ -173,7 +310,9 @@ def offer_download(response: Response, filename: str) -> None:
 def warnings_panel(warnings: list[str]) -> None:
     if not warnings:
         return
-    with ui.card().classes("bg-amber-50 border border-amber-300 w-full"):
-        ui.label("Design warnings").classes("font-semibold text-amber-700")
+    with ui.card().classes("bg-amber-50 border border-amber-300 w-full rounded-xl"):
+        with ui.row().classes("items-center gap-2"):
+            ui.icon("warning").classes("text-amber-600")
+            ui.label("Design warnings").classes("font-semibold text-amber-700")
         for w in warnings:
             ui.label(f"• {w}").classes("text-sm text-amber-800")
