@@ -98,6 +98,7 @@ export interface Interceptor {
   azimuth_deg: number;
   nav_constant: number;
   max_lateral_g: number;
+  guidance_law: string;
   seeker_delay: number;
   seeker_range: number;
   seeker_angular_noise: number;

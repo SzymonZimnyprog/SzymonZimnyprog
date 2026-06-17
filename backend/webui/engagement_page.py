@@ -36,6 +36,7 @@ from .common import (
     page_body,
     page_intro,
     plot,
+    select_field,
     stats_row,
     xy_fig,
 )
@@ -101,6 +102,9 @@ def engagement_page() -> None:
                     vec_inputs("Launch position", interceptor["launch_position"], "m",
                                help=H.GUIDANCE["launch_position"])
                     ui.label("Launch & guidance").classes("font-semibold mt-1")
+                    select_field(interceptor, "guidance_law", "Guidance law",
+                                 ["PN", "APN", "PN_GRAVITY"],
+                                 help=H.GUIDANCE["guidance_law"])
                     with ui.grid(columns=2).classes("gap-2 w-full"):
                         num(interceptor, "launch_speed", "Rail speed", unit="m/s",
                             step=5, help=H.LAUNCH["launch_speed"])

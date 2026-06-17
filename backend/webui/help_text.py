@@ -96,6 +96,10 @@ LAUNCH = {
 GUIDANCE = {
     "launch_position": "Launch site in ENU metres [East, North, Up] relative to "
     "the origin. Usually [0,0,0]; raise Up for a hilltop battery.",
+    "guidance_law": "Homing law. PN: classic proportional navigation. APN: "
+    "augmented PN, adds a target-acceleration term — better against a "
+    "manoeuvring target. PN_GRAVITY: PN plus a gravity-bias so the missile "
+    "doesn't sag below the line of sight on long lofted shots.",
     "nav_constant": "Proportional-navigation gain N (3–5 typical). Higher N "
     "pulls lead faster and flattens the trajectory but demands more lateral g; "
     "4 is the classic default.",

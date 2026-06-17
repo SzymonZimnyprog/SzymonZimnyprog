@@ -183,6 +183,15 @@ export default function EngagementPage() {
               onChange={(v) => patchInt({ elevation_deg: v })} />
             <NumberField label="Azimuth" unit="°" step={1} value={it.azimuth_deg}
               onChange={(v) => patchInt({ azimuth_deg: v })} />
+            <label className="field">
+              <span className="field-label">Guidance law</span>
+              <select value={it.guidance_law}
+                onChange={(e) => patchInt({ guidance_law: e.target.value })}>
+                <option value="PN">PN</option>
+                <option value="APN">APN</option>
+                <option value="PN_GRAVITY">PN + gravity</option>
+              </select>
+            </label>
             <NumberField label="Nav const N" step={0.5} min={2} max={6} value={it.nav_constant}
               onChange={(v) => patchInt({ nav_constant: v })} />
             <NumberField label="Max lateral" unit="g" step={5} value={it.max_lateral_g}

@@ -4,7 +4,12 @@ import numpy as np
 from fastapi.testclient import TestClient
 
 from backend.main import app
-from backend.sim.guidance import pn_acceleration, seeker_measurement
+from backend.sim.guidance import (
+    augmented_pn_acceleration,
+    guidance_command,
+    pn_acceleration,
+    seeker_measurement,
+)
 
 client = TestClient(app)
 
@@ -113,3 +118,43 @@ def test_seeker_noise_degrades_miss_distance():
         # the measured track should differ from the true track under noise
         assert d["target_measured"] != d["target_position"]
     assert max(misses) > clean["summary"]["miss_distance"]
+
+
+# --- guidance-law library -------------------------------------------------- #
+def test_guidance_command_defaults_to_pn():
+    r_m = np.array([0.0, 0.0, 0.0])
+    v_m = np.array([300.0, 0.0, 0.0])
+    r_t = np.array([1000.0, 200.0, 0.0])
+    v_t = np.array([0.0, 0.0, 0.0])
+    pn = pn_acceleration(r_m, v_m, r_t, v_t)
+    cmd = guidance_command("PN", r_m, v_m, r_t, v_t)
+    assert np.allclose(pn, cmd)
+
+
+def test_augmented_pn_adds_target_accel_term():
+    r_m = np.array([0.0, 0.0, 0.0])
+    v_m = np.array([500.0, 0.0, 0.0])
+    r_t = np.array([2000.0, 0.0, 0.0])
+    v_t = np.array([-200.0, 0.0, 0.0])
+    a_t = np.array([0.0, 80.0, 0.0])  # lateral target manoeuvre
+    pn = pn_acceleration(r_m, v_m, r_t, v_t, max_lateral_g=1e9)
+    apn = augmented_pn_acceleration(r_m, v_m, r_t, v_t, a_t, max_lateral_g=1e9)
+    # APN should differ from PN in the manoeuvre (y) direction
+    assert abs(apn[1] - pn[1]) > 1.0
+
+
+def test_apn_beats_pn_against_maneuvering_target():
+    base = {
+        "target": {
+            "position": [12000.0, 0.0, 7000.0],
+            "velocity": [-280.0, 0.0, -25.0],
+            "maneuver_accel": [0.0, 0.0, 60.0],
+        },
+        "dt": 0.01,
+    }
+    pn = client.post("/api/engagement/simulate",
+                     json={**base, "interceptor": {"guidance_law": "PN"}}).json()
+    apn = client.post("/api/engagement/simulate",
+                      json={**base, "interceptor": {"guidance_law": "APN"}}).json()
+    # against a manoeuvring target, augmented PN should not do worse
+    assert apn["summary"]["miss_distance"] <= pn["summary"]["miss_distance"] + 1e-6

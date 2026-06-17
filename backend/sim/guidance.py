@@ -58,6 +58,88 @@ def closing_speed(r_m: np.ndarray, v_m: np.ndarray,
     return -float(np.dot(rel_pos, v_t - v_m)) / rng
 
 
+# --------------------------------------------------------------------------- #
+# Guidance-law library
+# --------------------------------------------------------------------------- #
+GUIDANCE_LAWS = ("PN", "APN", "PN_GRAVITY")
+
+
+def _clamp(a_cmd: np.ndarray, max_lateral_g: float) -> np.ndarray:
+    a_max = max_lateral_g * G0
+    mag = float(np.linalg.norm(a_cmd))
+    if mag > a_max and mag > 0.0:
+        return a_cmd * (a_max / mag)
+    return a_cmd
+
+
+def augmented_pn_acceleration(
+    r_m: np.ndarray,
+    v_m: np.ndarray,
+    r_t: np.ndarray,
+    v_t: np.ndarray,
+    target_accel: np.ndarray,
+    nav_constant: float = 4.0,
+    max_lateral_g: float = 40.0,
+) -> np.ndarray:
+    """Augmented PN: true-PN term plus N/2 of the target acceleration normal
+    to the line of sight (effective against a manoeuvring target)."""
+    rel_pos = r_t - r_m
+    rng = float(np.linalg.norm(rel_pos))
+    if rng < 1e-6:
+        return np.zeros(3)
+    r_hat = rel_pos / rng
+    a_pn = pn_acceleration(r_m, v_m, r_t, v_t, nav_constant, max_lateral_g=1e9)
+    a_t_perp = target_accel - float(np.dot(target_accel, r_hat)) * r_hat
+    return _clamp(a_pn + 0.5 * nav_constant * a_t_perp, max_lateral_g)
+
+
+def pn_gravity_acceleration(
+    r_m: np.ndarray,
+    v_m: np.ndarray,
+    r_t: np.ndarray,
+    v_t: np.ndarray,
+    gravity: np.ndarray,
+    nav_constant: float = 4.0,
+    max_lateral_g: float = 40.0,
+) -> np.ndarray:
+    """True PN plus a gravity-bias term that cancels the component of gravity
+    perpendicular to the line of sight, so the missile doesn't sag below it."""
+    rel_pos = r_t - r_m
+    rng = float(np.linalg.norm(rel_pos))
+    if rng < 1e-6:
+        return np.zeros(3)
+    r_hat = rel_pos / rng
+    a_pn = pn_acceleration(r_m, v_m, r_t, v_t, nav_constant, max_lateral_g=1e9)
+    g_perp = gravity - float(np.dot(gravity, r_hat)) * r_hat
+    return _clamp(a_pn - g_perp, max_lateral_g)
+
+
+def guidance_command(
+    law: str,
+    r_m: np.ndarray,
+    v_m: np.ndarray,
+    r_t: np.ndarray,
+    v_t: np.ndarray,
+    *,
+    nav_constant: float = 4.0,
+    max_lateral_g: float = 40.0,
+    target_accel: np.ndarray | None = None,
+    gravity: np.ndarray | None = None,
+) -> np.ndarray:
+    """Dispatch to the selected guidance law (defaults to true PN)."""
+    if law == "APN":
+        ta = target_accel if target_accel is not None else np.zeros(3)
+        return augmented_pn_acceleration(
+            r_m, v_m, r_t, v_t, ta, nav_constant, max_lateral_g
+        )
+    if law == "PN_GRAVITY":
+        g = gravity if gravity is not None else np.zeros(3)
+        return pn_gravity_acceleration(
+            r_m, v_m, r_t, v_t, g, nav_constant, max_lateral_g
+        )
+    return pn_acceleration(r_m, v_m, r_t, v_t, nav_constant, max_lateral_g)
+
+
 def _unit(v: np.ndarray) -> np.ndarray:
     n = float(np.linalg.norm(v))
     return v / n if n > 1e-9 else np.zeros(3)

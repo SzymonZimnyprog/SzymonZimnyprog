@@ -193,6 +193,7 @@ class InterceptorModel(BaseModel):
     azimuth_deg: float = Field(90.0, ge=-180, le=360)
     nav_constant: float = Field(4.0, ge=2, le=6)
     max_lateral_g: float = Field(60.0, gt=0, le=100)
+    guidance_law: str = Field("PN", description="PN | APN | PN_GRAVITY")
     seeker_delay: float = Field(0.5, ge=0)
     seeker_range: float = Field(60000.0, gt=0)
     seeker_angular_noise: float = Field(
@@ -215,6 +216,7 @@ class InterceptorModel(BaseModel):
             propellant_mass=curve.propellant_mass_initial,
             nav_constant=self.nav_constant,
             max_lateral_g=self.max_lateral_g,
+            guidance_law=self.guidance_law,
             seeker_delay=self.seeker_delay,
             seeker_range=self.seeker_range,
             seeker_angular_noise=self.seeker_angular_noise / 1000.0,  # mrad -> rad

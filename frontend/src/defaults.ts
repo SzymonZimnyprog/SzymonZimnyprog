@@ -115,6 +115,7 @@ export const defaultEngagement: EngagementRequest = {
     azimuth_deg: 90,
     nav_constant: 4,
     max_lateral_g: 60,
+    guidance_law: "PN",
     seeker_delay: 0.5,
     seeker_range: 60000,
     seeker_angular_noise: 0,

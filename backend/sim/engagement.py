@@ -23,7 +23,7 @@ import numpy as np
 from .aerodynamics import Airframe
 from .atmosphere import atmosphere
 from .dynamics import GRAVITY, Vehicle, rk4_step
-from .guidance import closing_speed, pn_acceleration, seeker_measurement
+from .guidance import closing_speed, guidance_command, seeker_measurement
 
 
 def _unit(v: np.ndarray) -> np.ndarray:
@@ -63,6 +63,7 @@ class Interceptor:
     propellant_mass: float
     nav_constant: float = 4.0
     max_lateral_g: float = 40.0
+    guidance_law: str = "PN"        # PN | APN | PN_GRAVITY
     seeker_delay: float = 0.3       # s before guidance engages
     seeker_range: float = 50000.0   # m max acquisition range
     seeker_angular_noise: float = 0.0   # boresight 1-sigma, rad
@@ -209,10 +210,14 @@ def simulate_engagement(
                 r_t_for_guidance = r_t_meas
             else:
                 r_t_for_guidance = r_t
-            a_cmd = pn_acceleration(
+            target_accel = _target_derivative(t_state, target)[3:6]
+            a_cmd = guidance_command(
+                interceptor.guidance_law,
                 r_m, v_m, r_t_for_guidance, v_t,
                 nav_constant=interceptor.nav_constant,
                 max_lateral_g=interceptor.max_lateral_g,
+                target_accel=target_accel,
+                gravity=GRAVITY,
             )
 
         if step % sample_every == 0:
