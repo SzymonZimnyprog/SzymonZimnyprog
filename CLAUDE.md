@@ -5,11 +5,16 @@ This file provides guidance to AI assistants (Claude, etc.) working in this repo
 ## Project Overview
 
 Full-stack web application — a **parametric interceptor-missile & solid-rocket-motor
-simulator**:
+simulator**. There are **two interchangeable front ends over one Python core**:
 - **Backend**: Python 3.12 + FastAPI — REST API served at `http://localhost:8000`
-- **Frontend**: React 18 + TypeScript + Vite — dev server at `http://localhost:5173`
+- **React frontend**: React 18 + TypeScript + Vite — dev server at `http://localhost:5173`
+- **Pure-Python UI**: NiceGUI + Plotly mounted on the same FastAPI app — single
+  process at `http://localhost:8080` (`python -m backend.app` / `make ui`). No
+  Node required. It reuses the FastAPI router functions and the simulation core
+  directly, so the REST API (`/api/*`) and Swagger (`/docs`) stay available.
 
-The frontend proxies all `/api/*` requests to the backend (configured in `vite.config.ts`).
+The React frontend proxies all `/api/*` requests to the backend (configured in
+`vite.config.ts`).
 
 The simulation core (`backend/sim/`) models solid rocket motor internal
 ballistics, 3-DOF flight dynamics and proportional-navigation interception, and
@@ -35,7 +40,8 @@ purely kinematic closest-approach criterion.
 │
 ├── backend/
 │   ├── main.py                # FastAPI app entry point (registers routers)
-│   ├── requirements.txt       # Production dependencies (incl. numpy)
+│   ├── app.py                 # Pure-Python entry point: API + NiceGUI UI (:8080)
+│   ├── requirements.txt       # Production dependencies (incl. numpy, nicegui)
 │   ├── requirements-dev.txt   # Dev/test dependencies
 │   ├── .env.example           # Env var template — copy to .env
 │   ├── Dockerfile
@@ -59,12 +65,21 @@ purely kinematic closest-approach criterion.
 │   │   ├── missile.py         # /api/missile
 │   │   ├── engagement.py      # /api/engagement
 │   │   └── export.py          # /api/export (CAD + Simulink)
+│   ├── webui/                 # Pure-Python NiceGUI UI (reuses routers + sim)
+│   │   ├── __init__.py        #   init(app): mount UI onto FastAPI via run_with
+│   │   ├── common.py          #   shared widgets, Plotly figure builders
+│   │   ├── motor_page.py      #   Motor tab + reusable motor_form
+│   │   ├── missile_page.py    #   Trajectory tab
+│   │   ├── stack_page.py      #   Multi-stage tab (Run stack / Fly stack)
+│   │   ├── engagement_page.py #   Interception tab (engage/solve/salvo/MC)
+│   │   └── items_page.py      #   Items CRUD tab
 │   └── tests/
 │       ├── test_items.py
 │       ├── test_motor.py
 │       ├── test_missile.py
 │       ├── test_engagement.py
-│       └── test_export.py
+│       ├── test_export.py
+│       └── test_webui.py      # UI figure builders + geometry transforms
 │
 └── frontend/
     ├── index.html
@@ -94,7 +109,14 @@ purely kinematic closest-approach criterion.
 make install
 ```
 
-### Running locally (two terminals)
+### Running locally — pure Python (one terminal, no Node)
+
+```bash
+make ui                 # http://localhost:8080  (UI + /api + Swagger /docs)
+# or: python -m backend.app
+```
+
+### Running locally — React frontend (two terminals)
 
 ```bash
 # Terminal 1 — backend (hot reload)

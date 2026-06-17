@@ -20,6 +20,9 @@ node_modules/
 frontend/dist/
 frontend/.vite/
 
+# NiceGUI runtime storage
+.nicegui/
+
 # OS
 .DS_Store
 Thumbs.db

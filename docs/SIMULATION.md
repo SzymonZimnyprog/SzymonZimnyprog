@@ -28,8 +28,24 @@ backend/sim/        physics core (pure Python + numpy)
 
 backend/export/     stl.py (mesh), openscad.py (parametric), simulink.py
 backend/routers/    motor, missile, engagement, export
-frontend/src/       React UI (tabs: Interception / Motor / Trajectory / Items)
+backend/webui/      pure-Python NiceGUI UI (reuses the routers + sim core)
+backend/app.py      single-process entry point: REST API + NiceGUI UI (:8080)
+frontend/src/       React UI (tabs: Interception / Motor / Multi-stage /
+                    Trajectory / Items)
 ```
+
+## Running the UI
+
+Two interchangeable front ends sit on the same Python core and the same
+`/api/*` endpoints:
+
+* **Pure Python (no Node)** — `python -m backend.app` (or `make ui`) serves an
+  interactive [NiceGUI](https://nicegui.io) UI at `http://localhost:8080` in a
+  single process, alongside the REST API and Swagger `/docs`. The UI calls the
+  FastAPI router functions and the simulation core in-process and renders
+  Plotly charts.
+* **React + FastAPI** — `make dev-backend` (API at `:8000`) and
+  `make dev-frontend` (Vite UI at `:5173`).
 
 ## Physics models
 

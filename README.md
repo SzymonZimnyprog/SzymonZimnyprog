@@ -20,6 +20,31 @@ app, with **CAD** and **Simulink/MATLAB** export. It models:
 
 ## Quick start
 
+There are **two ways to run the app**, both backed by the identical Python
+simulation core.
+
+### A. Pure Python — one process, no Node (simplest)
+
+The whole app — REST API **and** an interactive web UI — runs from a single
+Python process, with the UI built in [NiceGUI](https://nicegui.io). No Node, no
+second terminal.
+
+```bash
+make install          # python venv (installs the UI too)
+make ui               # http://localhost:8080  (UI + /api + Swagger /docs)
+```
+
+```powershell
+# Windows (PowerShell, no make)
+.\setup.ps1           # create .venv + install deps
+.\dev-ui.ps1          # http://localhost:8080
+```
+
+If you only want the Python app, you can skip Node entirely:
+`pip install -r backend/requirements-dev.txt` then `python -m backend.app`.
+
+### B. React frontend + FastAPI backend (two processes)
+
 ```bash
 make install          # python venv + npm install
 make dev-backend      # FastAPI at http://localhost:8000  (Swagger: /docs)
@@ -28,31 +53,32 @@ make test             # backend pytest + frontend vitest
 make lint             # ruff + eslint
 ```
 
-### Windows (PowerShell, no `make`)
-
 ```powershell
+# Windows (PowerShell, no make)
 .\setup.ps1           # create .venv + install backend & frontend deps
 .\dev-backend.ps1     # terminal A — FastAPI at http://localhost:8000
 .\dev-frontend.ps1    # terminal B — Vite UI  at http://localhost:5173
 ```
 
 Run the scripts from the repository root. Prerequisites: Python 3.11+ (use
-`py -3` if `python` is not on PATH) and Node 18+. If scripts are blocked, allow
-them for the session with
+`py -3` if `python` is not on PATH); Node 18+ only for option **B**. If scripts
+are blocked, allow them for the session with
 `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`, or run the
 commands inside them directly.
 
 ## Web app
 
-Four tabs:
+The Python UI (`:8080`) and the React UI (`:5173`) expose the same tabs:
 
 - **Interception** — configure interceptor + target, run the engagement, or hit
   **Auto-aim** to compute the firing solution; see trajectories, separation,
-  the launch envelope, and INTERCEPT/MISS verdict. Export engagement CSV and a
-  MATLAB driver.
+  the launch envelope, INTERCEPT/MISS verdict, **Fire salvo** and
+  **Monte-Carlo Pk**.
 - **Motor** — propellant / grain / nozzle parameters, thrust & pressure curves,
-  design diagnostics & warnings, a **Design sweep** panel, and CAD/Simulink
-  export.
+  design diagnostics & warnings, and CAD/Simulink export.
+- **Multi-stage** — a stage stack: **Run stack** for the combined thrust
+  profile, **Fly stack** to fly the staged flight and jettison spent-stage mass
+  at each burnout.
 - **Trajectory** — single un-guided missile flight + airframe CAD export.
 - **Items** — original demo CRUD resource.
 

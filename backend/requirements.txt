@@ -3,3 +3,6 @@ uvicorn[standard]==0.34.0
 pydantic==2.10.4
 python-dotenv==1.0.1
 numpy==2.2.1
+# Pure-Python web UI (single-process, served alongside the REST API)
+nicegui==3.13.0
+plotly==6.8.0

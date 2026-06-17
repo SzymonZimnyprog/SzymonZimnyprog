@@ -1,9 +1,14 @@
-.PHONY: install dev test lint format
+.PHONY: install dev dev-ui ui test lint format
 
 # Install all dependencies
 install:
 	python -m venv .venv && .venv/bin/pip install -r backend/requirements-dev.txt
 	cd frontend && npm install
+
+# Pure-Python single-process app: REST API + NiceGUI UI together at :8080.
+# No Node, no second terminal — just Python.
+ui:
+	.venv/bin/python -m backend.app
 
 # Run backend + frontend in dev mode (requires two terminals or use docker-compose)
 dev-backend:

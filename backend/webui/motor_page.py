@@ -1,0 +1,166 @@
+"""Motor tab: internal ballistics, thrust/pressure curves, CAD & Simulink export."""
+
+from __future__ import annotations
+
+from nicegui import run, ui
+
+from backend.routers import export as export_router
+from backend.routers.motor import simulate as motor_simulate
+from backend.sim.models import MotorRequest, PropellantModel
+from backend.sim.propellant import PRESETS
+
+from .common import (
+    PALETTE,
+    header,
+    line_fig,
+    num,
+    offer_download,
+    page_intro,
+    stats_row,
+    warnings_panel,
+)
+
+GRAIN_TYPES = ["BATES", "TUBULAR", "ROD", "END_BURNER"]
+
+
+def motor_form(state: dict) -> None:
+    """Render the propellant / grain / nozzle form bound to ``state`` in place."""
+    prop = state["propellant"]
+    grain = state["grain"]
+    nozzle = state["nozzle"]
+
+    with ui.row().classes("gap-1 flex-wrap"):
+        ui.label("Propellant preset:").classes("self-center text-sm")
+        for key in PRESETS:
+            ui.button(
+                key,
+                on_click=lambda k=key: state["propellant"].update(
+                    PropellantModel.from_preset(k).model_dump(mode="json")
+                ),
+            ).props("dense outline")
+
+    with ui.expansion("Propellant parameters", icon="science").classes("w-full"):
+        with ui.grid(columns=2).classes("gap-2 w-full"):
+            num(prop, "a", "Burn-rate a", unit="mm/s@1MPa", step=0.1)
+            num(prop, "n", "Burn exponent n", step=0.01)
+            num(prop, "density", "Density", unit="kg/m³", step=10)
+            num(prop, "gamma", "γ (cp/cv)", step=0.01)
+            num(prop, "t_flame", "Flame temp", unit="K", step=50)
+            num(prop, "molar_mass", "Molar mass", unit="kg/mol", step=0.001)
+            num(prop, "c_star_eff", "c* efficiency", step=0.01)
+
+    ui.label("Grain").classes("font-semibold mt-2")
+    ui.select(GRAIN_TYPES, value=grain["grain_type"], label="Grain type").classes(
+        "w-full"
+    ).bind_value(grain, "grain_type")
+    with ui.grid(columns=2).classes("gap-2 w-full"):
+        num(grain, "outer_diameter", "Outer dia", unit="m", step=0.005)
+        num(grain, "core_diameter", "Core dia", unit="m", step=0.005)
+        num(grain, "segment_length", "Segment len", unit="m", step=0.01)
+        num(grain, "segments", "Segments", step=1, min=1)
+
+    ui.label("Nozzle").classes("font-semibold mt-2")
+    with ui.grid(columns=2).classes("gap-2 w-full"):
+        num(nozzle, "throat_diameter", "Throat dia", unit="m", step=0.002)
+        num(nozzle, "expansion_ratio", "Expansion ratio Ae/At", step=0.5)
+        num(nozzle, "efficiency", "Nozzle efficiency", step=0.01)
+
+    with ui.expansion("Environment & solver", icon="tune").classes("w-full"):
+        with ui.grid(columns=2).classes("gap-2 w-full"):
+            num(state, "altitude", "Altitude", unit="m", step=100)
+            num(state, "dt", "Time step", unit="s", step=0.001)
+            num(state, "max_time", "Max time", unit="s", step=5)
+
+
+@ui.page("/motor")
+def motor_page() -> None:
+    header("/motor")
+    state = MotorRequest().model_dump(mode="json")
+    result: dict = {}
+
+    page_intro(
+        "Solid rocket motor",
+        "Quasi-steady internal ballistics: equilibrium chamber pressure, nozzle "
+        "thrust coefficient and the resulting thrust curve, with design "
+        "diagnostics and CAD / Simulink export.",
+    )
+
+    with ui.row().classes("w-full gap-4 no-wrap items-start"):
+        with ui.card().classes("w-96"):
+            motor_form(state)
+            run_btn = ui.button("Run motor").classes("w-full mt-2")
+
+        results = ui.column().classes("flex-grow gap-3")
+
+    async def run_motor() -> None:
+        run_btn.props("loading")
+        try:
+            req = MotorRequest.model_validate(state)
+            result.clear()
+            result.update(await run.io_bound(motor_simulate, req))
+        except Exception as exc:  # noqa: BLE001 - surfaced to the user
+            ui.notify(str(exc), type="negative", multi_line=True)
+            return
+        finally:
+            run_btn.props(remove="loading")
+        render()
+
+    def render() -> None:
+        results.clear()
+        s = result["summary"]
+        with results:
+            stats_row(
+                [
+                    ("Total impulse", f"{s['total_impulse']:.0f} N·s"),
+                    ("Class", s["impulse_class"]),
+                    ("Peak thrust", f"{s['peak_thrust']:.0f} N"),
+                    ("Avg thrust", f"{s['average_thrust']:.0f} N"),
+                    ("Burn time", f"{s['burn_time']:.2f} s"),
+                    ("Isp", f"{s['specific_impulse']:.0f} s"),
+                    ("Peak Pc", f"{s['peak_pressure'] / 1e6:.2f} MPa"),
+                    ("Kn (init/max)", f"{s['kn_initial']:.0f}/{s['kn_max']:.0f}"),
+                    ("Port/throat", f"{s['port_to_throat']:.2f}"),
+                    ("Prop mass", f"{s['propellant_mass_initial']:.2f} kg"),
+                ]
+            )
+            warnings_panel(s["warnings"])
+            ui.plotly(
+                line_fig(
+                    "Time (s)",
+                    "Thrust (N)",
+                    [{"label": "Thrust", "color": PALETTE["indigo"],
+                      "x": result["time"], "y": result["thrust"]}],
+                )
+            ).classes("w-full")
+            ui.plotly(
+                line_fig(
+                    "Time (s)",
+                    "Chamber pressure (MPa)",
+                    [{"label": "Pc", "color": PALETTE["red"], "x": result["time"],
+                      "y": [p / 1e6 for p in result["chamber_pressure"]]}],
+                )
+            ).classes("w-full")
+
+            ui.label("Export").classes("font-semibold mt-2")
+            req = MotorRequest.model_validate(state)
+            with ui.row().classes("flex-wrap gap-2"):
+                _export_btn("grain.stl", export_router.grain_stl_export, req)
+                _export_btn("nozzle.stl", export_router.nozzle_stl_export, req)
+                _export_btn("grain.scad", export_router.grain_scad_export, req)
+                _export_btn("nozzle.scad", export_router.nozzle_scad_export, req)
+                _export_btn(
+                    "thrust_curve.csv", export_router.thrust_curve_csv_export, req
+                )
+                _export_btn("motor.eng", export_router.motor_eng_export, req)
+
+    run_btn.on_click(run_motor)
+
+
+def _export_btn(filename: str, fn, req) -> None:
+    def handler() -> None:
+        try:
+            offer_download(fn(req), filename)
+        except Exception as exc:  # noqa: BLE001
+            ui.notify(str(exc), type="negative")
+
+    ui.button(filename, on_click=handler).props("dense outline")
