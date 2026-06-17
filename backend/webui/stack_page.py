@@ -14,13 +14,13 @@ from backend.sim.models import AirframeModel, GrainModel, MotorRequest, Propella
 from . import help_text as H
 from .common import (
     PALETTE,
+    animated_path3d_fig,
     card,
     header,
     line_fig,
     num,
     page_body,
     page_intro,
-    path3d_fig,
     plot,
     select_field,
     stats_row,
@@ -285,11 +285,16 @@ def _render_flight(res: dict) -> None:
         ui.tab("Mass", icon="scale")
     with ui.tab_panels(tabs, value="3D").classes("w-full"):
         with ui.tab_panel("3D"):
+            ui.label(
+                "▶ Press Play to watch the stack climb and shed spent stages, "
+                "or drag the slider to scrub through the flight."
+            ).classes("text-sm text-slate-500")
             plot(
-                path3d_fig(
+                animated_path3d_fig(
                     [{"label": "Staged flight", "color": PALETTE["green"],
                       "x": [p[0] for p in pos], "y": [p[1] for p in pos],
                       "z": [p[2] for p in pos]}],
+                    times=res["time"],
                     markers=markers3d,
                 )
             )

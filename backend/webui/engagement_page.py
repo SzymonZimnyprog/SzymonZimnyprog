@@ -27,6 +27,7 @@ from backend.sim.models import EngagementRequest
 from . import help_text as H
 from .common import (
     PALETTE,
+    animated_path3d_fig,
     bar_fig,
     card,
     header,
@@ -34,7 +35,6 @@ from .common import (
     num,
     page_body,
     page_intro,
-    path3d_fig,
     plot,
     stats_row,
     xy_fig,
@@ -281,8 +281,12 @@ def _render_engagement(mode: str, data: dict, state: dict) -> None:
             ui.tab("Envelope", icon="radar")
     with ui.tab_panels(tabs, value="3D").classes("w-full"):
         with ui.tab_panel("3D"):
+            ui.label(
+                "▶ Press Play to watch the target fly and the interceptor run "
+                "it down, or drag the slider to scrub through the engagement."
+            ).classes("text-sm text-slate-500")
             plot(
-                path3d_fig(
+                animated_path3d_fig(
                     [
                         {"label": "Interceptor", "color": PALETTE["indigo"],
                          "x": [p[0] for p in ipos], "y": [p[1] for p in ipos],
@@ -291,6 +295,7 @@ def _render_engagement(mode: str, data: dict, state: dict) -> None:
                          "x": [p[0] for p in tpos], "y": [p[1] for p in tpos],
                          "z": [p[2] for p in tpos]},
                     ],
+                    times=eng["time"],
                     markers=marker3d,
                 )
             )

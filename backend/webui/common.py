@@ -279,6 +279,169 @@ def path3d_fig(
     return fig
 
 
+def _axis_range(values: list[float]) -> list[float]:
+    lo, hi = min(values), max(values)
+    pad = (hi - lo) * 0.05 or 1.0
+    return [lo - pad, hi + pad]
+
+
+def _resample(seq: list[float], idxs: list[int]) -> list[float]:
+    return [seq[i] for i in idxs]
+
+
+def animated_path3d_fig(
+    series: list[dict],
+    times: list[float] | None = None,
+    *,
+    markers: list[dict] | None = None,
+    frames: int = 90,
+    max_samples: int = 200,
+    height: int = 560,
+) -> go.Figure:
+    """An animated, replayable 3D trajectory.
+
+    Each series (``{label, color, x, y, z}``) is drawn as a growing trail with a
+    moving head marker; a Play/Pause control and a time slider scrub through the
+    flight. ``markers`` (e.g. the intercept point or stage separations) are shown
+    statically throughout. Axis ranges are fixed so the scene doesn't jump.
+    """
+    n_full = max((len(s["x"]) for s in series), default=0)
+    if n_full < 2:
+        return path3d_fig(series, markers=markers, height=height)
+
+    # Downsample each path to keep the animation light, preserving endpoints.
+    def ds_indices(n: int) -> list[int]:
+        if n <= max_samples:
+            return list(range(n))
+        return sorted(
+            {round(i * (n - 1) / (max_samples - 1)) for i in range(max_samples)}
+        )
+
+    ds = []
+    for s in series:
+        idxs = ds_indices(len(s["x"]))
+        ds.append(
+            {
+                "label": s["label"],
+                "color": s.get("color", PALETTE["indigo"]),
+                "x": _resample(s["x"], idxs),
+                "y": _resample(s["y"], idxs),
+                "z": _resample(s["z"], idxs),
+            }
+        )
+
+    n_anim = max(len(s["x"]) for s in ds)
+    n_frames = min(frames, n_anim)
+    fracs = [k / (n_frames - 1) for k in range(n_frames)]
+
+    def head(s: dict, f: float) -> int:
+        return int(round(f * (len(s["x"]) - 1)))
+
+    def traces_at(f: float) -> list[go.Scatter3d]:
+        data = []
+        for s in ds:
+            j = head(s, f)
+            data.append(
+                go.Scatter3d(
+                    x=s["x"][: j + 1], y=s["y"][: j + 1], z=s["z"][: j + 1],
+                    mode="lines", name=s["label"],
+                    line=dict(color=s["color"], width=5),
+                )
+            )
+            data.append(
+                go.Scatter3d(
+                    x=[s["x"][j]], y=[s["y"][j]], z=[s["z"][j]],
+                    mode="markers", showlegend=False,
+                    marker=dict(size=6, color=s["color"]),
+                )
+            )
+        return data
+
+    fig = go.Figure(
+        data=traces_at(0.0),
+        frames=[
+            go.Frame(data=traces_at(f), name=str(k)) for k, f in enumerate(fracs)
+        ],
+    )
+
+    # Static annotation markers (intercept point, stage separations).
+    for m in markers or []:
+        fig.add_trace(
+            go.Scatter3d(
+                x=[m["x"]], y=[m["y"]], z=[m["z"]], mode="markers+text",
+                text=[m["label"]], textposition="top center", showlegend=False,
+                marker=dict(size=7, color=m.get("color", PALETTE["red"]), symbol="x"),
+            )
+        )
+
+    # Slider labels in real seconds when a time base is supplied.
+    if times:
+        labels = [f"{times[int(round(f * (len(times) - 1)))]:.1f}" for f in fracs]
+    else:
+        labels = [str(k) for k in range(n_frames)]
+
+    allx = [v for s in ds for v in s["x"]]
+    ally = [v for s in ds for v in s["y"]]
+    allz = [v for s in ds for v in s["z"]]
+
+    play_args = [None, {"frame": {"duration": 60, "redraw": True},
+                        "fromcurrent": True, "transition": {"duration": 0}}]
+    pause_args = [[None], {"frame": {"duration": 0, "redraw": False},
+                           "mode": "immediate", "transition": {"duration": 0}}]
+
+    fig.update_layout(
+        template="plotly_white",
+        height=height,
+        margin=dict(l=0, r=0, t=10, b=0),
+        font=dict(family="Inter, sans-serif"),
+        legend=dict(orientation="h", yanchor="bottom", y=1.0, x=0),
+        scene=dict(
+            xaxis=dict(title="East (m)", range=_axis_range(allx)),
+            yaxis=dict(title="North (m)", range=_axis_range(ally)),
+            zaxis=dict(title="Up (m)", range=_axis_range(allz)),
+            aspectmode="data",
+        ),
+        updatemenus=[
+            dict(
+                type="buttons",
+                direction="left",
+                showactive=False,
+                x=0.0,
+                y=0.0,
+                xanchor="left",
+                yanchor="top",
+                pad=dict(t=2, r=8),
+                buttons=[
+                    dict(label="▶ Play", method="animate", args=play_args),
+                    dict(label="⏸ Pause", method="animate", args=pause_args),
+                ],
+            )
+        ],
+        sliders=[
+            dict(
+                active=0,
+                x=0.12,
+                len=0.88,
+                y=0.0,
+                yanchor="top",
+                pad=dict(t=2),
+                currentvalue=dict(prefix="t = ", suffix=" s", visible=True),
+                steps=[
+                    dict(
+                        method="animate",
+                        label=labels[k],
+                        args=[[str(k)], {"frame": {"duration": 0, "redraw": True},
+                                         "mode": "immediate",
+                                         "transition": {"duration": 0}}],
+                    )
+                    for k in range(n_frames)
+                ],
+            )
+        ],
+    )
+    return fig
+
+
 def bar_fig(
     xlabel: str, ylabel: str, x: list, y: list, *, height: int = 320
 ) -> go.Figure:

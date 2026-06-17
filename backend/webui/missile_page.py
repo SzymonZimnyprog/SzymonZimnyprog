@@ -14,6 +14,7 @@ from backend.sim.models import MissileRequest
 from . import help_text as H
 from .common import (
     PALETTE,
+    animated_path3d_fig,
     card,
     header,
     line_fig,
@@ -21,7 +22,6 @@ from .common import (
     offer_download,
     page_body,
     page_intro,
-    path3d_fig,
     plot,
     stats_row,
     xy_fig,
@@ -112,11 +112,16 @@ def trajectory_page() -> None:
                 ui.tab("Speed", icon="speed")
             with ui.tab_panels(tabs, value="3D").classes("w-full"):
                 with ui.tab_panel("3D"):
+                    ui.label(
+                        "▶ Press Play to watch the missile fly its arc, or drag "
+                        "the slider to scrub through the flight."
+                    ).classes("text-sm text-slate-500")
                     plot(
-                        path3d_fig(
+                        animated_path3d_fig(
                             [{"label": "Trajectory", "color": PALETTE["green"],
                               "x": [p[0] for p in pos], "y": [p[1] for p in pos],
-                              "z": [p[2] for p in pos]}]
+                              "z": [p[2] for p in pos]}],
+                            times=result["time"],
                         )
                     )
                 with ui.tab_panel("Profile"):

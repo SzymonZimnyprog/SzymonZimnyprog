@@ -71,9 +71,10 @@ commands inside them directly.
 The Python UI (`:8080`) and the React UI (`:5173`) expose the same tabs:
 
 - **Interception** — configure interceptor + target, run the engagement, or hit
-  **Auto-aim** to compute the firing solution; see trajectories, separation,
-  the launch envelope, INTERCEPT/MISS verdict, **Fire salvo** and
-  **Monte-Carlo Pk**.
+  **Auto-aim** to compute the firing solution; see an **animated 3D replay** of
+  the target flying and the interceptor running it down, plus separation, the
+  launch envelope, INTERCEPT/MISS verdict, **Fire salvo** and **Monte-Carlo Pk**.
+  (Animated 3D playback is in the Python UI.)
 - **Motor** — propellant / grain / nozzle parameters, thrust & pressure curves,
   design diagnostics & warnings, and CAD/Simulink export.
 - **Multi-stage** — a stage stack: **Run stack** for the combined thrust

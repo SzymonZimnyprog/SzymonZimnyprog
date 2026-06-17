@@ -56,6 +56,44 @@ def test_bar_fig_single_bar_trace():
     assert tuple(fig.data[0].y) == (3, 5, 1)
 
 
+def _ramp(n):
+    return {"label": "p", "x": list(range(n)), "y": list(range(n)),
+            "z": list(range(n))}
+
+
+def test_animated_path3d_has_frames_and_controls():
+    series = [_ramp(50)]
+    fig = common.animated_path3d_fig(series, times=[i * 0.1 for i in range(50)],
+                                     frames=30)
+    j = fig.to_plotly_json()
+    assert len(j["frames"]) == 30
+    # play/pause buttons present
+    labels = [b["label"] for b in j["layout"]["updatemenus"][0]["buttons"]]
+    assert any("Play" in lbl for lbl in labels)
+    assert any("Pause" in lbl for lbl in labels)
+    # time slider present, labelled in seconds
+    steps = j["layout"]["sliders"][0]["steps"]
+    assert len(steps) == 30
+    assert steps[0]["label"] == "0.0"
+
+
+def test_animated_path3d_first_frame_is_short_last_is_full():
+    series = [_ramp(40)]
+    fig = common.animated_path3d_fig(series, frames=20)
+    frames = fig.to_plotly_json()["frames"]
+    # trail trace (index 0) grows from ~1 point to the full path
+    first_trail = frames[0]["data"][0]["x"]
+    last_trail = frames[-1]["data"][0]["x"]
+    assert len(first_trail) == 1
+    assert len(last_trail) == 40
+
+
+def test_animated_path3d_degenerate_falls_back_to_static():
+    # a single sample can't animate; should return a static figure (no frames)
+    fig = common.animated_path3d_fig([_ramp(1)])
+    assert not fig.to_plotly_json().get("frames")
+
+
 def test_ground_at_picks_nearest_sample_time():
     times = [0.0, 1.0, 2.0, 3.0]
     ground = [0.0, 100.0, 250.0, 400.0]
