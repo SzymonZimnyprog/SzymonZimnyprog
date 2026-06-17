@@ -4,7 +4,7 @@ import numpy as np
 from fastapi.testclient import TestClient
 
 from backend.main import app
-from backend.sim.guidance import pn_acceleration
+from backend.sim.guidance import pn_acceleration, seeker_measurement
 
 client = TestClient(app)
 
@@ -60,3 +60,56 @@ def test_engagement_miss_when_target_receding():
     data = client.post("/api/engagement/simulate", json=payload).json()
     assert data["summary"]["intercepted"] is False
     assert data["summary"]["miss_distance"] > 5.0
+
+
+# --- seeker measurement noise --------------------------------------------- #
+def test_seeker_measurement_no_noise_is_exact():
+    rng = np.random.default_rng(0)
+    r_m = np.array([0.0, 0.0, 0.0])
+    r_t = np.array([1000.0, 0.0, 500.0])
+    meas = seeker_measurement(r_m, r_t, rng, 0.0, 0.0)
+    assert np.allclose(meas, r_t)
+
+
+def test_seeker_angular_noise_offsets_perpendicular_to_los():
+    rng = np.random.default_rng(1)
+    r_m = np.array([0.0, 0.0, 0.0])
+    r_t = np.array([1000.0, 0.0, 0.0])
+    # large boresight noise -> measurement wanders off-axis, range ~preserved
+    offsets = []
+    for _ in range(200):
+        m = seeker_measurement(r_m, r_t, rng, angular_sigma_rad=0.05)
+        offsets.append(m)
+    offsets = np.array(offsets)
+    # range to target roughly preserved (angular noise only)
+    ranges = np.linalg.norm(offsets, axis=1)
+    assert abs(ranges.mean() - 1000.0) < 5.0
+    # lateral spread (y/z) is non-trivial
+    assert offsets[:, 1].std() > 10.0 or offsets[:, 2].std() > 10.0
+
+
+def test_engagement_target_measured_equals_truth_without_noise():
+    data = client.post("/api/engagement/simulate", json={}).json()
+    assert data["target_measured"] == data["target_position"]
+
+
+def test_seeker_noise_degrades_miss_distance():
+    # A clean intercept becomes worse (on average) under heavy seeker noise.
+    clean = client.post("/api/engagement/simulate", json={}).json()
+    assert clean["summary"]["miss_distance"] < 5.0
+
+    misses = []
+    for seed in range(6):
+        payload = {
+            "interceptor": {
+                "seeker_angular_noise": 30.0,  # mrad, very noisy
+                "seeker_range_noise": 0.1,
+                "seeker_update_rate": 20.0,
+            },
+            "seed": seed,
+        }
+        d = client.post("/api/engagement/simulate", json=payload).json()
+        misses.append(d["summary"]["miss_distance"])
+        # the measured track should differ from the true track under noise
+        assert d["target_measured"] != d["target_position"]
+    assert max(misses) > clean["summary"]["miss_distance"]

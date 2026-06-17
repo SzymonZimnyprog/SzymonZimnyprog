@@ -106,6 +106,16 @@ GUIDANCE = {
     "the motor boost and the vehicle clear the rail. 0.3–1 s typical.",
     "seeker_range": "Max range (m) at which the seeker can see the target. "
     "Inside this the interceptor homes; outside it flies ballistically.",
+    "seeker_angular_noise": "Seeker boresight (line-of-sight) 1-σ error, in "
+    "milliradians. 0 = perfect. A few mrad is realistic; large values make the "
+    "interceptor chase a jittery track and miss. The solver ignores it (aims at "
+    "the nominal track) — only Engage/Monte-Carlo apply it.",
+    "seeker_range_noise": "Range-measurement 1-σ error as a fraction of range "
+    "(0.05 = 5%). Mostly affects closing-speed estimation; less critical than "
+    "angular noise for PN.",
+    "seeker_update_rate": "Seeker measurement rate (Hz). The noisy fix is held "
+    "between updates; 0 = continuous (refreshed every step). 10–50 Hz is "
+    "typical — lower rates let noise persist longer and hurt more.",
 }
 
 # Target -------------------------------------------------------------------- #

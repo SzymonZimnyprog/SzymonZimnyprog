@@ -39,6 +39,7 @@ def simulate(req: EngagementRequest):
         dt=req.dt,
         max_time=req.max_time,
         lethal_radius=req.lethal_radius,
+        seed=req.seed,
     )
     out = res.as_dict()
     out["interceptor_motor_summary"] = motor_res.as_dict()["summary"]

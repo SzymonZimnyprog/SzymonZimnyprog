@@ -102,6 +102,7 @@ def montecarlo_pk(
         eng = simulate_engagement(
             fixed, true_target, dt=dt, max_time=max_time,
             lethal_radius=lethal_radius,
+            seed=int(rng.integers(0, 2**32 - 1)),
         )
         miss = eng.miss_distance
         misses[i] = miss

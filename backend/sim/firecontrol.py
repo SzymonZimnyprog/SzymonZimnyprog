@@ -104,7 +104,15 @@ def solve_firing_solution(
     max_time: float = 120.0,
     lethal_radius: float = 5.0,
 ) -> FireSolution:
-    """Search launch elevation (and optionally azimuth) for minimum miss."""
+    """Search launch elevation (and optionally azimuth) for minimum miss.
+
+    The search aims at the *nominal* (noise-free) target, so any seeker
+    measurement noise on the interceptor is disabled here -- a firing solution
+    is computed against the estimated track, not the noise.
+    """
+    interceptor = replace(
+        interceptor, seeker_angular_noise=0.0, seeker_range_noise=0.0
+    )
     azimuth = bearing_to_target(interceptor.launch_position, target.position)
 
     def miss_at(elevation: float, az: float) -> tuple[float, EngagementResult]:

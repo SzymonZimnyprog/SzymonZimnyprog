@@ -195,6 +195,15 @@ class InterceptorModel(BaseModel):
     max_lateral_g: float = Field(60.0, gt=0, le=100)
     seeker_delay: float = Field(0.5, ge=0)
     seeker_range: float = Field(60000.0, gt=0)
+    seeker_angular_noise: float = Field(
+        0.0, ge=0, le=100, description="seeker boresight 1-sigma, mrad"
+    )
+    seeker_range_noise: float = Field(
+        0.0, ge=0, le=0.5, description="range 1-sigma, fraction of range"
+    )
+    seeker_update_rate: float = Field(
+        0.0, ge=0, le=1000, description="seeker measurement rate, Hz (0 = continuous)"
+    )
 
     def build(self) -> tuple[Interceptor, object]:
         vehicle, curve, motor_res = build_vehicle_and_curve(self.motor, self.airframe)
@@ -208,6 +217,9 @@ class InterceptorModel(BaseModel):
             max_lateral_g=self.max_lateral_g,
             seeker_delay=self.seeker_delay,
             seeker_range=self.seeker_range,
+            seeker_angular_noise=self.seeker_angular_noise / 1000.0,  # mrad -> rad
+            seeker_range_noise=self.seeker_range_noise,
+            seeker_update_rate=self.seeker_update_rate,
         )
         return interceptor, motor_res
 
@@ -218,3 +230,6 @@ class EngagementRequest(BaseModel):
     dt: float = Field(0.01, gt=0, le=0.1)
     max_time: float = Field(120.0, gt=0, le=600)
     lethal_radius: float = Field(5.0, gt=0)
+    seed: int | None = Field(
+        None, description="RNG seed for seeker noise (reproducible runs)"
+    )

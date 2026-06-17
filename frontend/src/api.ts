@@ -100,6 +100,9 @@ export interface Interceptor {
   max_lateral_g: number;
   seeker_delay: number;
   seeker_range: number;
+  seeker_angular_noise: number;
+  seeker_range_noise: number;
+  seeker_update_rate: number;
 }
 
 export interface Target {
@@ -117,6 +120,7 @@ export interface EngagementRequest {
   dt: number;
   max_time: number;
   lethal_radius: number;
+  seed?: number | null;
 }
 
 // --------------------------------------------------------------------------- //
@@ -169,6 +173,7 @@ export interface EngagementResult {
   time: number[];
   interceptor_position: number[][];
   target_position: number[][];
+  target_measured: number[][];
   separation: number[];
   interceptor_speed: number[];
   target_speed: number[];

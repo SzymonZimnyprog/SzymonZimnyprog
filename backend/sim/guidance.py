@@ -56,3 +56,46 @@ def closing_speed(r_m: np.ndarray, v_m: np.ndarray,
     if rng < 1e-9:
         return 0.0
     return -float(np.dot(rel_pos, v_t - v_m)) / rng
+
+
+def _unit(v: np.ndarray) -> np.ndarray:
+    n = float(np.linalg.norm(v))
+    return v / n if n > 1e-9 else np.zeros(3)
+
+
+def seeker_measurement(
+    r_m: np.ndarray,
+    r_t: np.ndarray,
+    rng: np.random.Generator,
+    angular_sigma_rad: float = 0.0,
+    range_frac_sigma: float = 0.0,
+) -> np.ndarray:
+    """Return a *measured* target position as seen by a noisy seeker.
+
+    The seeker observes the target along the line of sight with a boresight
+    (angular) error and a range error; both are zero-mean Gaussian. The
+    interceptor then steers on this estimate, while the true geometry (and hence
+    the real miss distance) is unaffected. This models a homing seeker's
+    measurement noise, not the target itself.
+    """
+    rel = r_t - r_m
+    rng_true = float(np.linalg.norm(rel))
+    if rng_true < 1e-6:
+        return r_t.copy()
+    r_hat = rel / rng_true
+
+    if angular_sigma_rad > 0.0:
+        # Two orthonormal directions perpendicular to the LOS.
+        ref = (np.array([1.0, 0.0, 0.0]) if abs(r_hat[0]) < 0.9
+               else np.array([0.0, 1.0, 0.0]))
+        e1 = _unit(np.cross(r_hat, ref))
+        e2 = np.cross(r_hat, e1)
+        d = rng.normal(0.0, angular_sigma_rad, size=2)
+        r_hat = _unit(r_hat + d[0] * e1 + d[1] * e2)
+
+    rng_meas = rng_true
+    if range_frac_sigma > 0.0:
+        rng_meas = rng_true * (1.0 + rng.normal(0.0, range_frac_sigma))
+    rng_meas = max(rng_meas, 1.0)
+
+    return r_m + r_hat * rng_meas

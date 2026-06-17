@@ -114,6 +114,22 @@ def engagement_page() -> None:
                             help=H.GUIDANCE["max_lateral_g"])
                         num(interceptor, "seeker_delay", "Seeker delay", unit="s",
                             step=0.1, help=H.GUIDANCE["seeker_delay"])
+                    with ui.expansion("Seeker noise", icon="blur_on").classes("w-full"):
+                        ui.label(
+                            "Steers on a noisy measured track; the true miss is "
+                            "still geometric. The seeker track is overlaid on the "
+                            "plots."
+                        ).classes("text-xs text-slate-500")
+                        with ui.grid(columns=3).classes("gap-2 w-full"):
+                            num(interceptor, "seeker_angular_noise", "Boresight σ",
+                                unit="mrad", step=1, min=0,
+                                help=H.GUIDANCE["seeker_angular_noise"])
+                            num(interceptor, "seeker_range_noise", "Range σ",
+                                unit="frac", step=0.01, min=0,
+                                help=H.GUIDANCE["seeker_range_noise"])
+                            num(interceptor, "seeker_update_rate", "Update rate",
+                                unit="Hz", step=5, min=0,
+                                help=H.GUIDANCE["seeker_update_rate"])
 
                 with card("Target", "adjust").classes("w-full"):
                     vec_inputs("Position", target["position"], "m",
@@ -263,6 +279,8 @@ def _render_engagement(mode: str, data: dict, state: dict) -> None:
     launch = state["interceptor"]["launch_position"]
     ipos = eng["interceptor_position"]
     tpos = eng["target_position"]
+    tmeas = eng.get("target_measured", [])
+    noisy = bool(tmeas) and tmeas != tpos
     ig = _ground(ipos, launch)
     tg = _ground(tpos, launch)
     marker2d, marker3d = [], []
@@ -271,6 +289,21 @@ def _render_engagement(mode: str, data: dict, state: dict) -> None:
         marker2d = [{"x": math.hypot(ip[0] - launch[0], ip[1] - launch[1]),
                      "y": ip[2], "label": "intercept"}]
         marker3d = [{"x": ip[0], "y": ip[1], "z": ip[2], "label": "intercept"}]
+
+    series3d = [
+        {"label": "Interceptor", "color": PALETTE["indigo"],
+         "x": [p[0] for p in ipos], "y": [p[1] for p in ipos],
+         "z": [p[2] for p in ipos]},
+        {"label": "Target", "color": PALETTE["red"],
+         "x": [p[0] for p in tpos], "y": [p[1] for p in tpos],
+         "z": [p[2] for p in tpos]},
+    ]
+    if noisy:
+        series3d.append(
+            {"label": "Seeker track", "color": PALETTE["amber"],
+             "x": [p[0] for p in tmeas], "y": [p[1] for p in tmeas],
+             "z": [p[2] for p in tmeas]}
+        )
 
     with ui.tabs().classes("w-full") as tabs:
         ui.tab("3D", icon="3d_rotation")
@@ -284,34 +317,30 @@ def _render_engagement(mode: str, data: dict, state: dict) -> None:
             ui.label(
                 "▶ Press Play to watch the target fly and the interceptor run "
                 "it down, or drag the slider to scrub through the engagement."
+                + (" Amber = the noisy track the seeker actually steers on."
+                   if noisy else "")
             ).classes("text-sm text-slate-500")
             plot(
                 animated_path3d_fig(
-                    [
-                        {"label": "Interceptor", "color": PALETTE["indigo"],
-                         "x": [p[0] for p in ipos], "y": [p[1] for p in ipos],
-                         "z": [p[2] for p in ipos]},
-                        {"label": "Target", "color": PALETTE["red"],
-                         "x": [p[0] for p in tpos], "y": [p[1] for p in tpos],
-                         "z": [p[2] for p in tpos]},
-                    ],
+                    series3d,
                     times=eng["time"],
                     markers=marker3d,
                 )
             )
         with ui.tab_panel("Profile"):
-            plot(
-                xy_fig(
-                    "Ground range (m)", "Altitude (m)",
-                    [
-                        {"label": "Interceptor", "color": PALETTE["indigo"],
-                         "x": ig, "y": [p[2] for p in ipos]},
-                        {"label": "Target", "color": PALETTE["red"],
-                         "x": tg, "y": [p[2] for p in tpos]},
-                    ],
-                    markers=marker2d,
+            profile = [
+                {"label": "Interceptor", "color": PALETTE["indigo"],
+                 "x": ig, "y": [p[2] for p in ipos]},
+                {"label": "Target", "color": PALETTE["red"],
+                 "x": tg, "y": [p[2] for p in tpos]},
+            ]
+            if noisy:
+                profile.append(
+                    {"label": "Seeker track", "color": PALETTE["amber"],
+                     "x": _ground(tmeas, launch), "y": [p[2] for p in tmeas]}
                 )
-            )
+            plot(xy_fig("Ground range (m)", "Altitude (m)", profile,
+                        markers=marker2d))
         with ui.tab_panel("Separation"):
             plot(
                 line_fig(

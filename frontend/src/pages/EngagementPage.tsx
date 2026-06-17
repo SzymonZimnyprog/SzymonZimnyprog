@@ -189,6 +189,15 @@ export default function EngagementPage() {
               onChange={(v) => patchInt({ max_lateral_g: v })} />
             <NumberField label="Seeker range" unit="m" step={1000} value={it.seeker_range}
               onChange={(v) => patchInt({ seeker_range: v })} />
+            <NumberField label="Seeker boresight σ" unit="mrad" step={1} min={0}
+              value={it.seeker_angular_noise}
+              onChange={(v) => patchInt({ seeker_angular_noise: v })} />
+            <NumberField label="Seeker range σ" unit="frac" step={0.01} min={0}
+              value={it.seeker_range_noise}
+              onChange={(v) => patchInt({ seeker_range_noise: v })} />
+            <NumberField label="Seeker rate" unit="Hz" step={5} min={0}
+              value={it.seeker_update_rate}
+              onChange={(v) => patchInt({ seeker_update_rate: v })} />
             <NumberField label="Dry mass" unit="kg" step={1} value={it.airframe.dry_mass}
               onChange={(v) => patchInt({ airframe: { ...it.airframe, dry_mass: v } })} />
           </div>

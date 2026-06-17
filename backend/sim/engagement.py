@@ -23,7 +23,7 @@ import numpy as np
 from .aerodynamics import Airframe
 from .atmosphere import atmosphere
 from .dynamics import GRAVITY, Vehicle, rk4_step
-from .guidance import closing_speed, pn_acceleration
+from .guidance import closing_speed, pn_acceleration, seeker_measurement
 
 
 def _unit(v: np.ndarray) -> np.ndarray:
@@ -65,6 +65,9 @@ class Interceptor:
     max_lateral_g: float = 40.0
     seeker_delay: float = 0.3       # s before guidance engages
     seeker_range: float = 50000.0   # m max acquisition range
+    seeker_angular_noise: float = 0.0   # boresight 1-sigma, rad
+    seeker_range_noise: float = 0.0     # range 1-sigma, fraction of range
+    seeker_update_rate: float = 0.0     # measurement rate, Hz (0 = continuous)
 
 
 @dataclass
@@ -76,6 +79,7 @@ class EngagementResult:
     interceptor_speed: list[float] = field(default_factory=list)
     target_speed: list[float] = field(default_factory=list)
     interceptor_accel_cmd: list[float] = field(default_factory=list)
+    target_measured: list[list[float]] = field(default_factory=list)
 
     intercepted: bool = False
     miss_distance: float = float("inf")
@@ -88,6 +92,7 @@ class EngagementResult:
             "time": self.time,
             "interceptor_position": self.interceptor_position,
             "target_position": self.target_position,
+            "target_measured": self.target_measured,
             "separation": self.separation,
             "interceptor_speed": self.interceptor_speed,
             "target_speed": self.target_speed,
@@ -147,8 +152,14 @@ def simulate_engagement(
     max_time: float = 120.0,
     lethal_radius: float = 5.0,
     sample_every: int = 5,
+    seed: int | None = None,
 ) -> EngagementResult:
-    """Run the engagement until intercept, miss, ground impact or timeout."""
+    """Run the engagement until intercept, miss, ground impact or timeout.
+
+    If the interceptor carries seeker noise, the guidance command is computed
+    from a *measured* (noisy) target position; the recorded geometry and miss
+    distance remain the true values. ``seed`` makes the noise reproducible.
+    """
     m_state = np.empty(7)
     m_state[0:3] = interceptor.launch_position
     m_state[3:6] = interceptor.launch_velocity
@@ -165,6 +176,15 @@ def simulate_engagement(
     prev_sep = float("inf")
     prev_rel = t_state[0:3] - m_state[0:3]
 
+    # Seeker measurement noise (zero-order hold between measurement updates).
+    rng = np.random.default_rng(seed)
+    noisy = (interceptor.seeker_angular_noise > 0.0
+             or interceptor.seeker_range_noise > 0.0)
+    meas_interval = (1.0 / interceptor.seeker_update_rate
+                     if interceptor.seeker_update_rate > 0.0 else 0.0)
+    r_t_meas = t_state[0:3].copy()
+    last_meas_t = -1e9
+
     while t <= max_time:
         r_m, v_m = m_state[0:3], m_state[3:6]
         r_t, v_t = t_state[0:3], t_state[3:6]
@@ -173,11 +193,24 @@ def simulate_engagement(
         # True closest approach over the step just taken (robust to dt).
         cpa = sep if step == 0 else _closest_approach(prev_rel, rel)
 
-        # Guidance command.
+        # Guidance command (steered on the measured target position).
         a_cmd = np.zeros(3)
-        if t >= interceptor.seeker_delay and sep <= interceptor.seeker_range:
+        guided = t >= interceptor.seeker_delay and sep <= interceptor.seeker_range
+        if guided:
+            if noisy:
+                due = (meas_interval == 0.0) or (t - last_meas_t >= meas_interval)
+                if due:
+                    r_t_meas = seeker_measurement(
+                        r_m, r_t, rng,
+                        angular_sigma_rad=interceptor.seeker_angular_noise,
+                        range_frac_sigma=interceptor.seeker_range_noise,
+                    )
+                    last_meas_t = t
+                r_t_for_guidance = r_t_meas
+            else:
+                r_t_for_guidance = r_t
             a_cmd = pn_acceleration(
-                r_m, v_m, r_t, v_t,
+                r_m, v_m, r_t_for_guidance, v_t,
                 nav_constant=interceptor.nav_constant,
                 max_lateral_g=interceptor.max_lateral_g,
             )
@@ -186,6 +219,8 @@ def simulate_engagement(
             res.time.append(t)
             res.interceptor_position.append(r_m.tolist())
             res.target_position.append(r_t.tolist())
+            meas = r_t_meas if (noisy and guided) else r_t
+            res.target_measured.append(meas.tolist())
             res.separation.append(sep)
             res.interceptor_speed.append(float(np.linalg.norm(v_m)))
             res.target_speed.append(float(np.linalg.norm(v_t)))

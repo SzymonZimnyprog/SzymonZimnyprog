@@ -117,6 +117,9 @@ export const defaultEngagement: EngagementRequest = {
     max_lateral_g: 60,
     seeker_delay: 0.5,
     seeker_range: 60000,
+    seeker_angular_noise: 0,
+    seeker_range_noise: 0,
+    seeker_update_rate: 0,
   },
   target: {
     position: [15000, 0, 8000],
