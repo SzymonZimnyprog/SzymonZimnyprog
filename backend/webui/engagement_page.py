@@ -26,6 +26,7 @@ from backend.routers.engagement import (
 from backend.routers.engagement import (
     solve as eng_solve,
 )
+from backend.sim.diagnostics import diagnose_engagement
 from backend.sim.models import EngagementRequest
 
 from . import help_text as H
@@ -322,6 +323,28 @@ def _ground(positions: list[list[float]], origin: list[float]) -> list[float]:
     return [math.hypot(p[0] - origin[0], p[1] - origin[1]) for p in positions]
 
 
+def _diagnosis_panel(eng: dict, state: dict) -> None:
+    it = state["interceptor"]
+    tgt = state["target"]
+    diag = diagnose_engagement(
+        eng,
+        max_lateral_g=it["max_lateral_g"],
+        lethal_radius=state["lethal_radius"],
+        target_maneuvering=any(abs(v) > 0 for v in tgt["maneuver_accel"]),
+        seeker_noisy=(it["seeker_angular_noise"] > 0
+                      or it["seeker_range_noise"] > 0),
+    )
+    icon = "check_circle" if diag["verdict"] == "hit" else "report_problem"
+    with ui.expansion("Why? — plain-language diagnosis", icon=icon,
+                      value=True).classes("w-full"):
+        for r in diag["reasons"]:
+            ui.label("• " + r).classes("text-sm text-slate-600")
+        for t in diag["tips"]:
+            with ui.row().classes("items-start gap-1 no-wrap"):
+                ui.icon("lightbulb").classes("text-amber-500 text-sm mt-0.5")
+                ui.label(t).classes("text-sm text-slate-700")
+
+
 def _render_engagement(mode: str, data: dict, state: dict) -> None:
     eng = data["engagement"] if mode == "solve" else data
     s = eng["summary"]
@@ -346,6 +369,8 @@ def _render_engagement(mode: str, data: dict, state: dict) -> None:
             ("Closing speed", f"{s['closing_speed_at_intercept']:.0f} m/s"),
         ]
     )
+
+    _diagnosis_panel(eng, state)
 
     launch = state["interceptor"]["launch_position"]
     ipos = eng["interceptor_position"]

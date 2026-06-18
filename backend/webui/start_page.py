@@ -12,6 +12,7 @@ import math
 from nicegui import run, ui
 
 from backend.routers.engagement import solve as eng_solve
+from backend.sim.diagnostics import diagnose_engagement
 from backend.sim.models import EngagementRequest
 
 from .common import (
@@ -209,6 +210,42 @@ def _render(results, sol: dict, sc: dict) -> None:
                           icon="help_outline").classes("w-full"):
             for line in _explain(sc, hit):
                 ui.label("• " + line).classes("text-sm text-slate-600")
+            diag = diagnose_engagement(
+                eng, max_lateral_g=60.0, lethal_radius=5.0,
+                target_maneuvering=sc["evasive"], seeker_noisy=False,
+            )
+            for r in diag["reasons"]:
+                ui.label("• " + r).classes("text-sm text-slate-600")
+            for t in diag["tips"]:
+                with ui.row().classes("items-start gap-1 no-wrap"):
+                    ui.icon("lightbulb").classes("text-amber-500 text-sm mt-0.5")
+                    ui.label(t).classes("text-sm text-slate-700")
+
+        _glossary()
+
+
+GLOSSARY = {
+    "Interceptor": "The small rocket we launch to catch the threat.",
+    "Threat / target": "The incoming object we're trying to stop.",
+    "Closest approach (miss distance)": "How near the interceptor passed to the "
+    "threat. Small enough = a catch.",
+    "Aiming (firing solution)": "The launch direction and angle the computer "
+    "works out so the two paths cross.",
+    "Guidance (proportional navigation)": "The in-flight steering rule that keeps "
+    "nudging the interceptor onto a collision course.",
+    "Seeker": "The interceptor's 'eye' that watches the threat after launch.",
+    "Static margin": "How stable the rocket is in flight (covered on the "
+    "Trajectory tab) — too little and it can't be steered.",
+}
+
+
+def _glossary() -> None:
+    with ui.expansion("Glossary — what do these words mean?",
+                      icon="menu_book").classes("w-full"):
+        for term, meaning in GLOSSARY.items():
+            with ui.row().classes("items-start gap-1 no-wrap"):
+                ui.label(term + ":").classes("text-sm font-semibold shrink-0")
+                ui.label(meaning).classes("text-sm text-slate-600")
 
 
 def _compass(az: float) -> str:
