@@ -195,6 +195,29 @@ out = szymon_sim_driver('engagement', req);    % req: scenario struct
 % ready for Simulink "From Workspace" blocks.
 ```
 
+## Guidance & sensors kit (bridge to flight software)
+
+To move a configuration from the simulator toward real guidance software, the
+exporter turns the interceptor settings into an implementation kit covering the
+**kinematic GNC loop only** (no warhead, fuzing or terminal-effects content):
+
+1. **Sensor spec + porting notes** (`POST /api/export/guidance/sensors.md`) —
+   which sensors realise the modelled seeker and autopilot (RF/IR seeker, IMU),
+   with the loop rate, angular/range accuracy budgets, acquisition range and
+   accelerometer full-scale read from the parameters, plus the control
+   architecture, ENU/body frames, units and a simulation→software parameter map.
+2. **Structured spec** (`POST /api/export/guidance/spec.json`) — the same data
+   as JSON for tooling.
+3. **Reference PN law in C** (`POST /api/export/guidance/pn_reference.c`) — a
+   self-contained `pn_command()` parameterised by the same navigation constant
+   `N` and acceleration limit, with optional gravity compensation for
+   `PN_GRAVITY`. Validate it against the recorded `engagement.csv` as a
+   software-in-the-loop reference (commanded acceleration should match the
+   `interceptor_accel_cmd` channel).
+
+The Interception tab exposes these as download buttons ("Guidance kit → flight
+software").
+
 ## Running
 
 ```bash

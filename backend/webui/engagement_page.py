@@ -6,6 +6,7 @@ import math
 
 from nicegui import run, ui
 
+from backend.routers import export as export_router
 from backend.routers.engagement import (
     DefendedAreaRequest,
     MonteCarloRequest,
@@ -31,7 +32,7 @@ from backend.routers.engagement import (
     solve as eng_solve,
 )
 from backend.sim.diagnostics import diagnose_engagement
-from backend.sim.models import EngagementRequest
+from backend.sim.models import EngagementRequest, InterceptorModel
 
 from . import help_text as H
 from .common import (
@@ -45,6 +46,7 @@ from .common import (
     heatmap_fig,
     line_fig,
     num,
+    offer_download,
     page_body,
     page_intro,
     plot,
@@ -236,6 +238,20 @@ def engagement_page() -> None:
                         num(extra, "da_alt_steps", "Alt steps", step=1, min=2, max=14)
                     da_btn = ui.button("Map defended area", icon="map")
                     da_btn.props("color=positive").classes("w-full")
+
+                with card("Guidance kit → flight software", "memory").classes("w-full"):
+                    ui.label(
+                        "Turn this interceptor's settings into a sensor spec and a "
+                        "reference PN steering law to port onto a guidance computer "
+                        "(kinematic GNC only)."
+                    ).classes("text-xs text-slate-500")
+                    with ui.row().classes("gap-2 flex-wrap"):
+                        _guidance_btn("sensors.md",
+                                      export_router.guidance_sensors_md_export,
+                                      "guidance_sensors.md", state)
+                        _guidance_btn("pn_reference.c",
+                                      export_router.guidance_pn_reference_export,
+                                      "pn_guidance.c", state)
 
             results = ui.column().classes("flex-grow gap-3 min-w-[420px]")
 
@@ -566,6 +582,19 @@ def _render_salvo(data: dict) -> None:
                 "then runs the target down. Green ✕ marks where a shot connects."
             ).classes("text-sm text-slate-500")
             plot(animated_salvo_fig(data))
+
+
+def _guidance_btn(label: str, fn, filename: str, state: dict) -> None:
+    def handler() -> None:
+        try:
+            req = InterceptorModel.model_validate(state["interceptor"])
+            offer_download(fn(req), filename)
+        except Exception as exc:  # noqa: BLE001
+            ui.notify(str(exc), type="negative")
+
+    ui.button(label, icon="download", on_click=handler).props(
+        "dense outline no-caps"
+    )
 
 
 def _fan_threats(target: dict, n: int) -> list[dict]:

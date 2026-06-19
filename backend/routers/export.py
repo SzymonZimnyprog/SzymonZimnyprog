@@ -9,13 +9,14 @@ import numpy as np
 from fastapi import APIRouter, Response
 from pydantic import BaseModel, Field
 
-from backend.export import openscad, simulink
+from backend.export import guidance_kit, openscad, simulink
 from backend.export.stl import airframe_stl, grain_stl, nozzle_stl
 from backend.sim.dynamics import propagate
 from backend.sim.engagement import simulate_engagement
 from backend.sim.models import (
     AirframeModel,
     EngagementRequest,
+    InterceptorModel,
     MissileRequest,
     MotorRequest,
     build_vehicle_and_curve,
@@ -151,3 +152,27 @@ def engagement_csv_export(req: EngagementRequest):
 @router.get("/simulink/driver.m")
 def matlab_driver_export():
     return _download(simulink.matlab_driver(), "szymon_sim_driver.m", "text/plain")
+
+
+# --------------------------------------------------------------------------- #
+# Guidance & sensors kit (bridge to real guidance software)
+# --------------------------------------------------------------------------- #
+@router.post("/guidance/spec.json")
+def guidance_spec_export(req: InterceptorModel):
+    """Structured sensor + GNC specification for the interceptor."""
+    return guidance_kit.sensor_spec(req)
+
+
+@router.post("/guidance/sensors.md")
+def guidance_sensors_md_export(req: InterceptorModel):
+    """Human-readable sensor spec + porting notes (Markdown)."""
+    return _download(guidance_kit.sensor_spec_markdown(req),
+                     "guidance_sensors.md", "text/markdown")
+
+
+@router.post("/guidance/pn_reference.c")
+def guidance_pn_reference_export(req: InterceptorModel):
+    """Reference proportional-navigation steering law in C for this config."""
+    return _download(guidance_kit.pn_reference_c(req),
+                     "pn_guidance.c", "text/x-csrc")
+
