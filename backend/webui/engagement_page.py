@@ -33,6 +33,7 @@ from . import help_text as H
 from .common import (
     PALETTE,
     animated_path3d_fig,
+    animated_salvo_fig,
     bar_fig,
     card,
     header,
@@ -515,6 +516,15 @@ def _render_salvo(data: dict) -> None:
         for sh in data["shots"]
     ]
     ui.table(columns=columns, rows=rows).classes("w-full sim-card")
+
+    if data.get("duration"):
+        with ui.expansion("▶ Watch the salvo in 3D", icon="3d_rotation",
+                          value=True).classes("w-full"):
+            ui.label(
+                "Each interceptor waits on the pad until its staggered launch, "
+                "then runs the target down. Green ✕ marks where a shot connects."
+            ).classes("text-sm text-slate-500")
+            plot(animated_salvo_fig(data))
 
 
 def _render_montecarlo(data: dict) -> None:

@@ -51,3 +51,24 @@ def test_single_shot_salvo_has_no_spread():
     assert data["count"] == 1
     assert len(data["shots"]) == 1
     assert data["shots"][0]["launch_time"] == 0.0
+
+
+def test_salvo_exposes_absolute_time_tracks_for_animation():
+    data = client.post(
+        "/api/engagement/salvo",
+        json={"count": 3, "stagger": 1.0, "auto_aim": False},
+    ).json()
+    assert data["duration"] > 0.0
+    # Each shot carries an absolute-time interceptor track starting at its launch.
+    for sh in data["shots"]:
+        tr = sh["track"]
+        assert len(tr["t"]) == len(tr["x"]) == len(tr["y"]) == len(tr["z"]) >= 2
+        assert abs(tr["t"][0] - sh["launch_time"]) < 1e-6
+        assert tr["t"] == sorted(tr["t"])
+        if sh["intercepted"]:
+            assert sh["intercept_point"] is not None
+    # The shared target track is a single, monotonic absolute timeline.
+    tt = data["target_track"]
+    assert tt["t"][0] == 0.0
+    assert tt["t"] == sorted(tt["t"])
+    assert tt["t"][-1] <= data["duration"] + 1e-6

@@ -94,6 +94,40 @@ def test_animated_path3d_degenerate_falls_back_to_static():
     assert not fig.to_plotly_json().get("frames")
 
 
+def _salvo_track(t0, t1, n=10):
+    ts = [t0 + (t1 - t0) * k / (n - 1) for k in range(n)]
+    return {"t": ts, "x": list(ts), "y": [0.0] * n, "z": list(ts)}
+
+
+def test_animated_salvo_fig_animates_shots_on_a_common_timeline():
+    data = {
+        "duration": 8.0,
+        "target_track": _salvo_track(0.0, 8.0, 20),
+        "shots": [
+            {"index": 0, "intercepted": False, "miss_distance": 40.0,
+             "intercept_point": None, "track": _salvo_track(0.0, 7.0)},
+            {"index": 1, "intercepted": True, "miss_distance": 2.0,
+             "intercept_point": [5.0, 0.0, 5.0], "track": _salvo_track(2.0, 8.0)},
+        ],
+    }
+    fig = common.animated_salvo_fig(data, frames=20)
+    j = fig.to_plotly_json()
+    assert j["frames"]
+    # one animated trail+head pair per series (target + 2 shots = 3 series)
+    assert len(j["frames"][0]["data"]) == 6
+    # the staggered second shot sits on the pad until t=2 (interp clamps),
+    # so its first samples don't move
+    head_x = [fr["data"][5]["x"][0] for fr in j["frames"]]
+    assert head_x[0] == head_x[1]  # still on the pad early on
+    assert head_x[-1] > head_x[0]  # has flown by the end
+    # the intercept point is marked
+    assert any(t.get("text") for t in j["data"])
+
+
+def test_animated_salvo_fig_empty_without_tracks():
+    assert not common.animated_salvo_fig({}).to_plotly_json().get("frames")
+
+
 def test_ground_at_picks_nearest_sample_time():
     times = [0.0, 1.0, 2.0, 3.0]
     ground = [0.0, 100.0, 250.0, 400.0]

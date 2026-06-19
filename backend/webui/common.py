@@ -12,6 +12,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
+import numpy as np
 import plotly.graph_objects as go
 from fastapi import Response
 from nicegui import ui
@@ -457,6 +458,55 @@ def animated_path3d_fig(
         ],
     )
     return fig
+
+
+_SHOT_COLORS = [
+    PALETTE["indigo"], PALETTE["sky"], PALETTE["violet"], PALETTE["amber"],
+    PALETTE["green"], PALETTE["slate"],
+]
+
+
+def animated_salvo_fig(data: dict, *, frames: int = 90, height: int = 560) -> go.Figure:
+    """Replayable 3D animation of a staggered salvo against one target.
+
+    Every shot's absolute-time track and the shared target track are resampled
+    onto one common timeline, so the single progress slider is real seconds:
+    interceptors sit on the pad until their staggered launch (``np.interp``
+    clamps before the first sample), then fly. Intercept points are marked.
+    """
+    shots = data.get("shots", [])
+    tt = data.get("target_track", {})
+    duration = float(data.get("duration") or 0.0)
+    if not shots or duration <= 0.0 or len(tt.get("t", [])) < 2:
+        return go.Figure()
+
+    n = max(2, min(frames * 2, 180))
+    grid = [duration * k / (n - 1) for k in range(n)]
+
+    def on_grid(track: dict) -> dict:
+        t = np.asarray(track["t"], dtype=float)
+        return {
+            "x": list(np.interp(grid, t, track["x"])),
+            "y": list(np.interp(grid, t, track["y"])),
+            "z": list(np.interp(grid, t, track["z"])),
+        }
+
+    series = [{"label": "Target", "color": PALETTE["red"], **on_grid(tt)}]
+    for sh in shots:
+        c = _SHOT_COLORS[sh["index"] % len(_SHOT_COLORS)]
+        label = f"Shot {sh['index'] + 1}" + (" ✓" if sh["intercepted"] else "")
+        series.append({"label": label, "color": c, **on_grid(sh["track"])})
+
+    # Mark only the closest intercept to avoid a cluster of overlapping labels
+    # when several shots connect near the same point.
+    hits = [sh for sh in shots if sh["intercepted"] and sh.get("intercept_point")]
+    markers = []
+    if hits:
+        best = min(hits, key=lambda sh: sh["miss_distance"])
+        ip = best["intercept_point"]
+        markers = [{"x": ip[0], "y": ip[1], "z": ip[2],
+                    "label": "intercept", "color": PALETTE["green"]}]
+    return animated_path3d_fig(series, times=grid, markers=markers, height=height)
 
 
 def stability_fig(res: dict, *, height: int = 220) -> go.Figure:
