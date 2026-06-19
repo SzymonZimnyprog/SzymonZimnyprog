@@ -509,6 +509,54 @@ def animated_salvo_fig(data: dict, *, frames: int = 90, height: int = 560) -> go
     return animated_path3d_fig(series, times=grid, markers=markers, height=height)
 
 
+def animated_raid_fig(data: dict, *, frames: int = 90, height: int = 600) -> go.Figure:
+    """Replayable 3D animation of a many-on-many raid.
+
+    All threat and interceptor tracks share one absolute clock (every engagement
+    starts at t=0), resampled onto a common grid so the slider is real seconds.
+    Threats are red (paler once killed); each threat's interceptors share a cool
+    colour, and every successful intercept is marked.
+    """
+    targets = data.get("targets", [])
+    interceptors = data.get("interceptors", [])
+    duration = float(data.get("duration") or 0.0)
+    if not targets or duration <= 0.0:
+        return go.Figure()
+
+    n = max(2, min(frames * 2, 180))
+    grid = [duration * k / (n - 1) for k in range(n)]
+
+    def on_grid(track: dict) -> dict:
+        t = np.asarray(track["t"], dtype=float)
+        return {
+            "x": list(np.interp(grid, t, track["x"])),
+            "y": list(np.interp(grid, t, track["y"])),
+            "z": list(np.interp(grid, t, track["z"])),
+        }
+
+    series = []
+    for tg in targets:
+        if len(tg["track"].get("t", [])) < 2:
+            continue
+        color = "#ef4444" if not tg["intercepted"] else "#fca5a5"
+        label = f"Threat {tg['index'] + 1}" + ("" if tg["intercepted"] else " ⚠")
+        series.append({"label": label, "color": color, **on_grid(tg["track"])})
+    for it in interceptors:
+        if len(it["track"].get("t", [])) < 2:
+            continue
+        color = _SHOT_COLORS[it["target_index"] % len(_SHOT_COLORS)]
+        label = f"→ T{it['target_index'] + 1}" + (" ✓" if it["intercepted"] else "")
+        series.append({"label": label, "color": color, **on_grid(it["track"])})
+
+    markers = [
+        {"x": tg["intercept_point"][0], "y": tg["intercept_point"][1],
+         "z": tg["intercept_point"][2], "label": f"T{tg['index'] + 1}",
+         "color": PALETTE["green"]}
+        for tg in targets if tg["intercepted"] and tg.get("intercept_point")
+    ]
+    return animated_path3d_fig(series, times=grid, markers=markers, height=height)
+
+
 def stability_fig(res: dict, *, height: int = 220) -> go.Figure:
     """Horizontal schematic of the airframe with CP and CG marked."""
     total = res["body_length_total"]

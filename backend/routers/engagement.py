@@ -6,8 +6,9 @@ from pydantic import BaseModel, Field
 from backend.sim.coverage import defended_area
 from backend.sim.engagement import simulate_engagement
 from backend.sim.firecontrol import solve_firing_solution
-from backend.sim.models import EngagementRequest
+from backend.sim.models import EngagementRequest, InterceptorModel, TargetModel
 from backend.sim.montecarlo import montecarlo_pk
+from backend.sim.raid import simulate_raid
 from backend.sim.salvo import simulate_salvo
 
 router = APIRouter()
@@ -35,6 +36,29 @@ class SalvoRequest(BaseModel):
     stagger: float = Field(1.0, ge=0.0, le=30.0, description="s between launches")
     elevation_spread: float = Field(6.0, ge=0.0, le=40.0, description="deg total")
     auto_aim: bool = True
+
+
+def _default_raid_threats() -> list[TargetModel]:
+    """A small inbound raid fanned across downrange, altitude and bearing."""
+    return [
+        TargetModel(position=[16000.0, -4000.0, 9000.0],
+                    velocity=[-300.0, 70.0, -30.0]),
+        TargetModel(position=[18000.0, 0.0, 7000.0],
+                    velocity=[-320.0, 0.0, -25.0]),
+        TargetModel(position=[15000.0, 5000.0, 10000.0],
+                    velocity=[-290.0, -90.0, -35.0]),
+    ]
+
+
+class RaidRequest(BaseModel):
+    interceptor: InterceptorModel = Field(default_factory=InterceptorModel)
+    threats: list[TargetModel] = Field(default_factory=_default_raid_threats)
+    interceptors_per_threat: int = Field(1, ge=1, le=4)
+    stagger: float = Field(0.8, ge=0.0, le=30.0, description="s between salvo shots")
+    elevation_spread: float = Field(4.0, ge=0.0, le=40.0, description="deg total")
+    dt: float = Field(0.01, gt=0, le=0.1)
+    max_time: float = Field(120.0, gt=0, le=600)
+    lethal_radius: float = Field(5.0, gt=0)
 
 
 class MonteCarloRequest(BaseModel):
@@ -103,6 +127,27 @@ def salvo(req: SalvoRequest):
         dt=eng.dt,
         max_time=eng.max_time,
         lethal_radius=eng.lethal_radius,
+    )
+    out = result.as_dict()
+    out["interceptor_motor_summary"] = motor_res.as_dict()["summary"]
+    return out
+
+
+@router.post("/raid")
+def raid(req: RaidRequest):
+    """Defend against a many-on-many raid: one auto-aimed salvo per threat."""
+    interceptor, motor_res = req.interceptor.build()
+    threats = [t.to_target() for t in req.threats]
+    result = simulate_raid(
+        interceptor,
+        threats,
+        launch_speed=req.interceptor.launch_speed,
+        interceptors_per_threat=req.interceptors_per_threat,
+        stagger=req.stagger,
+        elevation_spread=req.elevation_spread,
+        dt=req.dt,
+        max_time=req.max_time,
+        lethal_radius=req.lethal_radius,
     )
     out = result.as_dict()
     out["interceptor_motor_summary"] = motor_res.as_dict()["summary"]

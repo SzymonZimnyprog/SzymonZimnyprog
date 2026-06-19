@@ -9,6 +9,7 @@ from nicegui import run, ui
 from backend.routers.engagement import (
     DefendedAreaRequest,
     MonteCarloRequest,
+    RaidRequest,
     SalvoRequest,
 )
 from backend.routers.engagement import (
@@ -16,6 +17,9 @@ from backend.routers.engagement import (
 )
 from backend.routers.engagement import (
     montecarlo as eng_montecarlo,
+)
+from backend.routers.engagement import (
+    raid as eng_raid,
 )
 from backend.routers.engagement import (
     salvo as eng_salvo,
@@ -33,6 +37,7 @@ from . import help_text as H
 from .common import (
     PALETTE,
     animated_path3d_fig,
+    animated_raid_fig,
     animated_salvo_fig,
     bar_fig,
     card,
@@ -75,6 +80,8 @@ def engagement_page() -> None:
         "salvo_count": 3,
         "salvo_stagger": 1.0,
         "salvo_spread": 6.0,
+        "raid_count": 3,
+        "raid_per_threat": 1,
         "mc_trials": 150,
         "mc_pos_sigma": 200.0,
         "mc_vel_sigma": 20.0,
@@ -190,6 +197,19 @@ def engagement_page() -> None:
                     salvo_btn = ui.button("Fire salvo", icon="whatshot")
                     salvo_btn.props("color=warning").classes("w-full")
 
+                with card("Raid (many-on-many)", "groups").classes("w-full"):
+                    ui.label(
+                        "Fan several inbound threats out from the Target above and "
+                        "auto-aim a salvo at each. The raid is beaten only if none "
+                        "leak through."
+                    ).classes("text-xs text-slate-500")
+                    with ui.grid(columns=2).classes("gap-2 w-full"):
+                        num(extra, "raid_count", "Threats", step=1, min=1, max=6)
+                        num(extra, "raid_per_threat", "Intc/threat", step=1,
+                            min=1, max=4)
+                    raid_btn = ui.button("Defend raid", icon="shield")
+                    raid_btn.props("color=warning").classes("w-full")
+
                 with card("Monte-Carlo Pk", "casino").classes("w-full"):
                     with ui.grid(columns=3).classes("gap-2 w-full"):
                         num(extra, "mc_trials", "Trials", step=10, min=10, max=1000,
@@ -250,6 +270,21 @@ def engagement_page() -> None:
         )
         await _run(salvo_btn, "salvo", eng_salvo, req)
 
+    async def defend_raid():
+        req = RaidRequest.model_validate(
+            {
+                "interceptor": state["interceptor"],
+                "threats": _fan_threats(state["target"], int(extra["raid_count"])),
+                "interceptors_per_threat": int(extra["raid_per_threat"]),
+                "stagger": extra["salvo_stagger"],
+                "elevation_spread": extra["salvo_spread"],
+                "dt": state["dt"],
+                "max_time": state["max_time"],
+                "lethal_radius": state["lethal_radius"],
+            }
+        )
+        await _run(raid_btn, "raid", eng_raid, req)
+
     async def run_mc():
         req = MonteCarloRequest.model_validate(
             {
@@ -286,6 +321,8 @@ def engagement_page() -> None:
                 _render_engagement(mode, data, state)
             elif mode == "salvo":
                 _render_salvo(data)
+            elif mode == "raid":
+                _render_raid(data)
             elif mode == "montecarlo":
                 _render_montecarlo(data)
             elif mode == "defended":
@@ -294,6 +331,7 @@ def engagement_page() -> None:
     run_btn.on_click(engage)
     solve_btn.on_click(autoaim)
     salvo_btn.on_click(fire_salvo)
+    raid_btn.on_click(defend_raid)
     mc_btn.on_click(run_mc)
     da_btn.on_click(map_area)
 
@@ -525,6 +563,62 @@ def _render_salvo(data: dict) -> None:
                 "then runs the target down. Green ✕ marks where a shot connects."
             ).classes("text-sm text-slate-500")
             plot(animated_salvo_fig(data))
+
+
+def _fan_threats(target: dict, n: int) -> list[dict]:
+    """Spread ``n`` threats in cross-range and altitude around the base target."""
+    pos = target["position"]
+    vel = target["velocity"]
+    threats = []
+    for i in range(n):
+        off = 0.0 if n == 1 else (i - (n - 1) / 2.0) / ((n - 1) / 2.0)  # -1..1
+        threats.append({
+            **target,
+            "position": [pos[0] + off * 2000.0, pos[1] + off * 5000.0,
+                         pos[2] + abs(off) * 2000.0],
+            "velocity": [vel[0], vel[1] - off * 60.0, vel[2]],
+        })
+    return threats
+
+
+def _render_raid(data: dict) -> None:
+    beaten = data["leakers"] == 0
+    ui.label("✓ RAID DEFEATED" if beaten else f"✗ {data['leakers']} LEAKER(S)").classes(
+        "text-2xl font-bold " + ("text-green-600" if beaten else "text-red-600")
+    )
+    ipk = data["interceptors_per_kill"]
+    stats_row([
+        ("Threats", str(data["threats"])),
+        ("Killed", str(data["killed"])),
+        ("Leakers", str(data["leakers"])),
+        ("Interceptors", str(data["interceptors_fired"])),
+        ("Intc / kill", f"{ipk:.1f}" if ipk else "—"),
+    ])
+    columns = [
+        {"name": "threat", "label": "Threat", "field": "threat"},
+        {"name": "assigned", "label": "Interceptors", "field": "assigned"},
+        {"name": "miss", "label": "Best miss (m)", "field": "miss"},
+        {"name": "result", "label": "Result", "field": "result"},
+    ]
+    rows = [
+        {
+            "threat": tg["index"] + 1,
+            "assigned": tg["assigned"],
+            "miss": f"{tg['best_miss']:.2f}",
+            "result": "KILLED" if tg["intercepted"] else "LEAKER",
+        }
+        for tg in data["targets"]
+    ]
+    ui.table(columns=columns, rows=rows).classes("w-full sim-card")
+
+    if data.get("duration"):
+        with ui.expansion("▶ Watch the raid in 3D", icon="3d_rotation",
+                          value=True).classes("w-full"):
+            ui.label(
+                "Red = threats (faded once killed); cool trails = the interceptors "
+                "assigned to each. Green ✕ marks every successful intercept."
+            ).classes("text-sm text-slate-500")
+            plot(animated_raid_fig(data))
 
 
 def _render_montecarlo(data: dict) -> None:

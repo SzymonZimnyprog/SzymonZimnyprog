@@ -128,6 +128,35 @@ def test_animated_salvo_fig_empty_without_tracks():
     assert not common.animated_salvo_fig({}).to_plotly_json().get("frames")
 
 
+def test_animated_raid_fig_draws_every_threat_and_interceptor():
+    data = {
+        "duration": 8.0,
+        "targets": [
+            {"index": 0, "intercepted": True, "intercept_point": [5.0, 0.0, 5.0],
+             "track": _salvo_track(0.0, 6.0)},
+            {"index": 1, "intercepted": False, "intercept_point": None,
+             "track": _salvo_track(0.0, 8.0)},
+        ],
+        "interceptors": [
+            {"index": 0, "target_index": 0, "intercepted": True,
+             "intercept_point": [5.0, 0.0, 5.0], "track": _salvo_track(0.0, 6.0)},
+            {"index": 1, "target_index": 1, "intercepted": False,
+             "intercept_point": None, "track": _salvo_track(0.0, 7.0)},
+        ],
+    }
+    fig = common.animated_raid_fig(data, frames=20)
+    j = fig.to_plotly_json()
+    assert j["frames"]
+    # 2 threats + 2 interceptors = 4 series -> 8 animated traces per frame
+    assert len(j["frames"][0]["data"]) == 8
+    # one intercept marker (only threat 0 was killed)
+    assert sum(1 for t in j["data"] if t.get("text")) == 1
+
+
+def test_animated_raid_fig_empty_without_targets():
+    assert not common.animated_raid_fig({}).to_plotly_json().get("frames")
+
+
 def test_ground_at_picks_nearest_sample_time():
     times = [0.0, 1.0, 2.0, 3.0]
     ground = [0.0, 100.0, 250.0, 400.0]
