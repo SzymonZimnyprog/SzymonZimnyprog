@@ -9,6 +9,7 @@ from backend.sim.models import (
     AirframeModel,
     MissileRequest,
     MotorRequest,
+    WindModel,
     build_vehicle_and_curve,
     launch_velocity,
 )
@@ -73,6 +74,7 @@ def simulate(req: MissileRequest):
         propellant_mass=curve.propellant_mass_initial,
         dt=req.dt,
         max_time=req.max_time,
+        wind=req.wind.to_wind(),
     )
     out = traj.as_dict()
     out["motor_summary"] = motor_res.as_dict()["summary"]
@@ -105,6 +107,7 @@ def optimize_launch(req: LaunchOptimizeRequest):
             vehicle, launch_position=np.zeros(3), launch_velocity=vel,
             propellant_mass=curve.propellant_mass_initial,
             dt=req.missile.dt, max_time=req.missile.max_time,
+            wind=req.missile.wind.to_wind(),
         )
 
     def objective(elevation: float) -> float:
@@ -137,6 +140,7 @@ class MultiStageFlightRequest(BaseModel):
     drop_last_stage: bool = False
     dt: float = Field(0.02, gt=0, le=0.5)
     max_time: float = Field(600.0, gt=0, le=2000)
+    wind: WindModel = WindModel()
 
 
 @router.post("/multistage")
@@ -180,6 +184,7 @@ def multistage_flight(req: MultiStageFlightRequest):
         separation_events=separation_events,
         dt=req.dt,
         max_time=req.max_time,
+        wind=req.wind.to_wind(),
     )
     out = traj.as_dict()
     out["separations"] = events

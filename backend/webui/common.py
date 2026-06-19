@@ -146,6 +146,27 @@ def num(
     return field
 
 
+_COMPASS = {0: "N", 45: "NE", 90: "E", 135: "SE", 180: "S", 225: "SW",
+            270: "W", 315: "NW", 360: "N"}
+
+
+def wind_form(wind: dict) -> None:
+    """Shared wind-field controls (speed, bearing, altitude shear)."""
+    with ui.expansion("Wind", icon="air").classes("w-full"):
+        ui.label(
+            "Steady wind acting on the air-relative airspeed: a crosswind drags "
+            "the flight downwind, a head/tail wind changes the drag it feels. "
+            "Bearing is where the wind blows FROM (meteorological)."
+        ).classes("text-xs text-slate-500")
+        with ui.grid(columns=3).classes("gap-2 w-full"):
+            num(wind, "speed", "Speed", unit="m/s", step=2, min=0,
+                help="Wind speed at the reference altitude (0 = calm).")
+            num(wind, "from_deg", "From", unit="°", step=15, min=0, max=360,
+                help="Compass bearing the wind blows FROM: 270° = westerly.")
+            num(wind, "shear", "Shear", step=0.05, min=0, max=1,
+                help="Power-law profile exponent; 0 = uniform, ~0.14 open terrain.")
+
+
 def select_field(
     target: dict, key: str, label: str, options: list[str], *, help: str = ""
 ) -> ui.select:

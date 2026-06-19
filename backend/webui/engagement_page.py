@@ -50,6 +50,7 @@ from .common import (
     plot,
     select_field,
     stats_row,
+    wind_form,
     xy_fig,
 )
 from .motor_page import motor_form
@@ -179,6 +180,7 @@ def engagement_page() -> None:
                             help=H.ENGAGEMENT["max_time"])
                         num(state, "lethal_radius", "Lethal R", unit="m", step=1,
                             help=H.ENGAGEMENT["lethal_radius"])
+                    wind_form(state["wind"])
 
                 with ui.row().classes("w-full gap-2 no-wrap"):
                     run_btn = ui.button("Engage", icon="play_arrow")
@@ -281,6 +283,7 @@ def engagement_page() -> None:
                 "dt": state["dt"],
                 "max_time": state["max_time"],
                 "lethal_radius": state["lethal_radius"],
+                "wind": state["wind"],
             }
         )
         await _run(raid_btn, "raid", eng_raid, req)

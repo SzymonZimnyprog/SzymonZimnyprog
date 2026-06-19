@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 
 from .engagement import Interceptor, Target
 from .salvo import simulate_salvo
+from .wind import WindField
 
 
 @dataclass
@@ -51,6 +52,7 @@ def simulate_raid(
     dt: float = 0.01,
     max_time: float = 120.0,
     lethal_radius: float = 5.0,
+    wind: WindField | None = None,
 ) -> RaidResult:
     """Engage every threat with its own auto-aimed salvo; report the raid outcome."""
     res = RaidResult(threats=len(threats))
@@ -62,7 +64,7 @@ def simulate_raid(
             stagger=stagger,
             elevation_spread=elevation_spread,
             auto_aim=True,
-            dt=dt, max_time=max_time, lethal_radius=lethal_radius,
+            dt=dt, max_time=max_time, lethal_radius=lethal_radius, wind=wind,
         ).as_dict()
 
         hit = sv["intercepted"]

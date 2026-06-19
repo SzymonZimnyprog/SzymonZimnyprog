@@ -25,6 +25,7 @@ from .engagement import (
     Target,
     simulate_engagement,
 )
+from .wind import WindField
 
 
 def _launch_velocity(
@@ -81,12 +82,14 @@ def _evaluate(
     dt: float,
     max_time: float,
     lethal_radius: float,
+    wind: WindField | None = None,
 ) -> EngagementResult:
     candidate = replace(
         interceptor, launch_velocity=_launch_velocity(speed, elevation, azimuth)
     )
     return simulate_engagement(
-        candidate, target, dt=dt, max_time=max_time, lethal_radius=lethal_radius
+        candidate, target, dt=dt, max_time=max_time, lethal_radius=lethal_radius,
+        wind=wind,
     )
 
 
@@ -103,6 +106,7 @@ def solve_firing_solution(
     final_dt: float = 0.01,
     max_time: float = 120.0,
     lethal_radius: float = 5.0,
+    wind: WindField | None = None,
 ) -> FireSolution:
     """Search launch elevation (and optionally azimuth) for minimum miss.
 
@@ -118,7 +122,7 @@ def solve_firing_solution(
     def miss_at(elevation: float, az: float) -> tuple[float, EngagementResult]:
         res = _evaluate(
             interceptor, target, launch_speed, elevation, az,
-            search_dt, max_time, lethal_radius,
+            search_dt, max_time, lethal_radius, wind,
         )
         return res.miss_distance, res
 
@@ -166,7 +170,7 @@ def solve_firing_solution(
     # ---- final high-resolution run at the solution ------------------------
     final = _evaluate(
         interceptor, target, launch_speed, best_el, azimuth,
-        final_dt, max_time, lethal_radius,
+        final_dt, max_time, lethal_radius, wind,
     )
     s = final.as_dict()["summary"]
     return FireSolution(

@@ -16,6 +16,7 @@ from .engagement import Interceptor, Target
 from .grain import Grain, GrainType
 from .motor import Nozzle
 from .propellant import PRESETS, Propellant
+from .wind import WindField
 
 
 # --------------------------------------------------------------------------- #
@@ -107,6 +108,23 @@ class AirframeModel(BaseModel):
 # --------------------------------------------------------------------------- #
 # Standalone missile trajectory
 # --------------------------------------------------------------------------- #
+class WindModel(BaseModel):
+    speed: float = Field(0.0, ge=0, le=120, description="wind speed, m/s")
+    from_deg: float = Field(
+        270.0, ge=0, le=360, description="compass bearing wind blows FROM"
+    )
+    reference_alt: float = Field(10.0, gt=0, description="altitude of ``speed``, m")
+    shear: float = Field(
+        0.0, ge=0, le=1, description="power-law profile exponent (0 = uniform)"
+    )
+
+    def to_wind(self) -> WindField:
+        return WindField(
+            speed=self.speed, from_deg=self.from_deg,
+            reference_alt=self.reference_alt, shear=self.shear,
+        )
+
+
 class MissileRequest(BaseModel):
     motor: MotorRequest = MotorRequest()
     airframe: AirframeModel = AirframeModel()
@@ -115,6 +133,7 @@ class MissileRequest(BaseModel):
     azimuth_deg: float = Field(0.0, ge=-180, le=360, description="launch azimuth")
     dt: float = Field(0.02, gt=0, le=0.5)
     max_time: float = Field(300.0, gt=0, le=1200)
+    wind: WindModel = WindModel()
 
 
 def launch_velocity(
@@ -236,6 +255,7 @@ class EngagementRequest(BaseModel):
     dt: float = Field(0.01, gt=0, le=0.1)
     max_time: float = Field(120.0, gt=0, le=600)
     lethal_radius: float = Field(5.0, gt=0)
+    wind: WindModel = WindModel()
     seed: int | None = Field(
         None, description="RNG seed for seeker noise (reproducible runs)"
     )

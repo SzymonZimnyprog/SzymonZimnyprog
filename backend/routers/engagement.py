@@ -6,7 +6,12 @@ from pydantic import BaseModel, Field
 from backend.sim.coverage import defended_area
 from backend.sim.engagement import simulate_engagement
 from backend.sim.firecontrol import solve_firing_solution
-from backend.sim.models import EngagementRequest, InterceptorModel, TargetModel
+from backend.sim.models import (
+    EngagementRequest,
+    InterceptorModel,
+    TargetModel,
+    WindModel,
+)
 from backend.sim.montecarlo import montecarlo_pk
 from backend.sim.raid import simulate_raid
 from backend.sim.salvo import simulate_salvo
@@ -59,6 +64,7 @@ class RaidRequest(BaseModel):
     dt: float = Field(0.01, gt=0, le=0.1)
     max_time: float = Field(120.0, gt=0, le=600)
     lethal_radius: float = Field(5.0, gt=0)
+    wind: WindModel = Field(default_factory=WindModel)
 
 
 class MonteCarloRequest(BaseModel):
@@ -81,6 +87,7 @@ def simulate(req: EngagementRequest):
         max_time=req.max_time,
         lethal_radius=req.lethal_radius,
         seed=req.seed,
+        wind=req.wind.to_wind(),
     )
     out = res.as_dict()
     out["interceptor_motor_summary"] = motor_res.as_dict()["summary"]
@@ -104,6 +111,7 @@ def solve(req: EngagementRequest):
         final_dt=req.dt,
         max_time=req.max_time,
         lethal_radius=req.lethal_radius,
+        wind=req.wind.to_wind(),
     )
     out = solution.as_dict()
     out["interceptor_motor_summary"] = motor_res.as_dict()["summary"]
@@ -127,6 +135,7 @@ def salvo(req: SalvoRequest):
         dt=eng.dt,
         max_time=eng.max_time,
         lethal_radius=eng.lethal_radius,
+        wind=eng.wind.to_wind(),
     )
     out = result.as_dict()
     out["interceptor_motor_summary"] = motor_res.as_dict()["summary"]
@@ -148,6 +157,7 @@ def raid(req: RaidRequest):
         dt=req.dt,
         max_time=req.max_time,
         lethal_radius=req.lethal_radius,
+        wind=req.wind.to_wind(),
     )
     out = result.as_dict()
     out["interceptor_motor_summary"] = motor_res.as_dict()["summary"]

@@ -18,6 +18,7 @@ import numpy as np
 
 from .engagement import Interceptor, Target, advance_target, simulate_engagement
 from .firecontrol import bearing_to_target, solve_firing_solution
+from .wind import WindField
 
 
 def _launch_velocity(
@@ -78,6 +79,7 @@ def simulate_salvo(
     dt: float = 0.01,
     max_time: float = 120.0,
     lethal_radius: float = 5.0,
+    wind: WindField | None = None,
 ) -> SalvoResult:
     """Fire ``count`` staggered interceptors and report each shot's outcome."""
     azimuth = bearing_to_target(interceptor.launch_position, target.position)
@@ -85,7 +87,7 @@ def simulate_salvo(
     if auto_aim:
         nominal = solve_firing_solution(
             interceptor, target, launch_speed=launch_speed,
-            max_time=max_time, lethal_radius=lethal_radius,
+            max_time=max_time, lethal_radius=lethal_radius, wind=wind,
         )
         nominal_el = nominal.elevation_deg
         azimuth = nominal.azimuth_deg
@@ -101,14 +103,14 @@ def simulate_salvo(
         launch_time = i * stagger
         offset = 0.0 if count == 1 else (i - (count - 1) / 2.0) / (count - 1)
         elevation = nominal_el + elevation_spread * offset
-        moved_target = advance_target(target, launch_time)
+        moved_target = advance_target(target, launch_time, wind=wind)
         shot_interceptor = replace(
             interceptor,
             launch_velocity=_launch_velocity(launch_speed, elevation, azimuth),
         )
         eng = simulate_engagement(
             shot_interceptor, moved_target, dt=dt, max_time=max_time,
-            lethal_radius=lethal_radius,
+            lethal_radius=lethal_radius, wind=wind,
         )
         d = eng.as_dict()
         summary = d["summary"]

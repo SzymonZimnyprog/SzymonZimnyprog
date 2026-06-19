@@ -29,6 +29,7 @@ from .guidance import (
     guidance_command,
     seeker_measurement,
 )
+from .wind import WindField
 
 
 def _unit(v: np.ndarray) -> np.ndarray:
@@ -116,13 +117,16 @@ class EngagementResult:
         }
 
 
-def _target_derivative(state: np.ndarray, target: Target) -> np.ndarray:
+def _target_derivative(
+    state: np.ndarray, target: Target, wind: WindField | None = None
+) -> np.ndarray:
     vel = state[3:6]
-    speed = float(np.linalg.norm(vel))
+    v_air = vel if wind is None else vel - wind.at(state[2])
+    air_speed = float(np.linalg.norm(v_air))
     atmo = atmosphere(state[2])
-    mach = speed / atmo.speed_of_sound if atmo.speed_of_sound > 0 else 0.0
-    drag_mag = target.airframe.drag(atmo.density, speed, mach)
-    a_drag = -_unit(vel) * (drag_mag / target.mass)
+    mach = air_speed / atmo.speed_of_sound if atmo.speed_of_sound > 0 else 0.0
+    drag_mag = target.airframe.drag(atmo.density, air_speed, mach)
+    a_drag = -_unit(v_air) * (drag_mag / target.mass)
     accel = a_drag + GRAVITY + target.maneuver_accel
     deriv = np.empty(6)
     deriv[0:3] = vel
@@ -130,15 +134,19 @@ def _target_derivative(state: np.ndarray, target: Target) -> np.ndarray:
     return deriv
 
 
-def _target_rk4(state: np.ndarray, dt: float, target: Target) -> np.ndarray:
-    k1 = _target_derivative(state, target)
-    k2 = _target_derivative(state + 0.5 * dt * k1, target)
-    k3 = _target_derivative(state + 0.5 * dt * k2, target)
-    k4 = _target_derivative(state + dt * k3, target)
+def _target_rk4(
+    state: np.ndarray, dt: float, target: Target, wind: WindField | None = None
+) -> np.ndarray:
+    k1 = _target_derivative(state, target, wind)
+    k2 = _target_derivative(state + 0.5 * dt * k1, target, wind)
+    k3 = _target_derivative(state + 0.5 * dt * k2, target, wind)
+    k4 = _target_derivative(state + dt * k3, target, wind)
     return state + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
 
 
-def advance_target(target: Target, duration: float, dt: float = 0.05) -> Target:
+def advance_target(
+    target: Target, duration: float, dt: float = 0.05, wind: WindField | None = None
+) -> Target:
     """Return a copy of the target propagated forward by ``duration`` seconds."""
     from dataclasses import replace
 
@@ -150,7 +158,7 @@ def advance_target(target: Target, duration: float, dt: float = 0.05) -> Target:
     steps = max(1, int(round(duration / dt)))
     h = duration / steps
     for _ in range(steps):
-        state = _target_rk4(state, h, target)
+        state = _target_rk4(state, h, target, wind)
     return replace(target, position=state[0:3].copy(), velocity=state[3:6].copy())
 
 
@@ -162,6 +170,7 @@ def simulate_engagement(
     lethal_radius: float = 5.0,
     sample_every: int = 5,
     seed: int | None = None,
+    wind: WindField | None = None,
 ) -> EngagementResult:
     """Run the engagement until intercept, miss, ground impact or timeout.
 
@@ -231,7 +240,7 @@ def simulate_engagement(
                     r_t_for_guidance = r_t_meas
             else:
                 r_t_for_guidance = r_t
-            target_accel = _target_derivative(t_state, target)[3:6]
+            target_accel = _target_derivative(t_state, target, wind)[3:6]
             a_cmd = guidance_command(
                 interceptor.guidance_law,
                 r_m, v_m, r_t_for_guidance, v_t,
@@ -278,8 +287,8 @@ def simulate_engagement(
         if m_down or t_down:
             break
 
-        m_state = rk4_step(m_state, t, dt, interceptor.vehicle, a_cmd, launch_dir)
-        t_state = _target_rk4(t_state, dt, target)
+        m_state = rk4_step(m_state, t, dt, interceptor.vehicle, a_cmd, launch_dir, wind)
+        t_state = _target_rk4(t_state, dt, target, wind)
         t += dt
         step += 1
 

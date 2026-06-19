@@ -29,6 +29,7 @@ from .common import (
     stability_fig,
     stats_row,
     warnings_panel,
+    wind_form,
     xy_fig,
 )
 from .motor_page import motor_form
@@ -70,6 +71,7 @@ def trajectory_page() -> None:
                         help=H.LAUNCH["azimuth_deg"])
                     num(state, "dt", "Time step", unit="s", step=0.01,
                         help=H.ENGAGEMENT["dt"])
+                wind_form(state["wind"])
                 with ui.expansion("Airframe CAD", icon="view_in_ar").classes("w-full"):
                     with ui.grid(columns=2).classes("gap-2 w-full"):
                         num(cad, "body_length", "Body length", unit="m", step=0.1)

@@ -23,6 +23,7 @@ import numpy as np
 from .aerodynamics import Airframe
 from .atmosphere import G0, atmosphere
 from .motor import ThrustCurve
+from .wind import WindField
 
 GRAVITY = np.array([0.0, 0.0, -G0])
 
@@ -47,28 +48,32 @@ def derivative(
     vehicle: Vehicle,
     lateral_accel: np.ndarray,
     launch_dir: np.ndarray,
+    wind: WindField | None = None,
 ) -> np.ndarray:
     """Return d(state)/dt for the 7-element point-mass state."""
     pos = state[0:3]
     vel = state[3:6]
     mass = max(state[6], 1e-3)
 
-    speed = float(np.linalg.norm(vel))
+    ground_speed = float(np.linalg.norm(vel))
+    # Aerodynamics act on the air-relative velocity (drag, Mach).
+    v_air = vel if wind is None else vel - wind.at(pos[2])
+    air_speed = float(np.linalg.norm(v_air))
     atmo = atmosphere(pos[2])
-    mach = speed / atmo.speed_of_sound if atmo.speed_of_sound > 0 else 0.0
+    mach = air_speed / atmo.speed_of_sound if atmo.speed_of_sound > 0 else 0.0
 
-    # Thrust.
+    # Thrust (along the flight path / body axis, approximated by ground velocity).
     thrust_mag = 0.0
     mdot = 0.0
     if vehicle.thrust_curve is not None:
         thrust_mag = vehicle.thrust_curve.thrust_at(t)
         mdot = vehicle.thrust_curve.mass_flow_at(t)
-    thrust_dir = _unit(vel) if speed > 1.0 else _unit(launch_dir)
+    thrust_dir = _unit(vel) if ground_speed > 1.0 else _unit(launch_dir)
     a_thrust = thrust_dir * (thrust_mag / mass)
 
-    # Drag (opposes velocity).
-    drag_mag = vehicle.airframe.drag(atmo.density, speed, mach)
-    a_drag = -_unit(vel) * (drag_mag / mass)
+    # Drag (opposes the air-relative velocity).
+    drag_mag = vehicle.airframe.drag(atmo.density, air_speed, mach)
+    a_drag = -_unit(v_air) * (drag_mag / mass)
 
     accel = a_thrust + a_drag + GRAVITY + lateral_accel
 
@@ -86,6 +91,7 @@ def rk4_step(
     vehicle: Vehicle,
     lateral_accel: np.ndarray,
     launch_dir: np.ndarray,
+    wind: WindField | None = None,
 ) -> np.ndarray:
     """Single classical Runge-Kutta 4 step.
 
@@ -93,10 +99,11 @@ def rk4_step(
     across the step (computed once per outer iteration).
     """
     half = 0.5 * dt
-    k1 = derivative(state, t, vehicle, lateral_accel, launch_dir)
-    k2 = derivative(state + half * k1, t + half, vehicle, lateral_accel, launch_dir)
-    k3 = derivative(state + half * k2, t + half, vehicle, lateral_accel, launch_dir)
-    k4 = derivative(state + dt * k3, t + dt, vehicle, lateral_accel, launch_dir)
+    la, ld = lateral_accel, launch_dir
+    k1 = derivative(state, t, vehicle, la, ld, wind)
+    k2 = derivative(state + half * k1, t + half, vehicle, la, ld, wind)
+    k3 = derivative(state + half * k2, t + half, vehicle, la, ld, wind)
+    k4 = derivative(state + dt * k3, t + dt, vehicle, la, ld, wind)
     return state + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
 
 
@@ -143,6 +150,7 @@ def propagate(
     dt: float = 0.02,
     max_time: float = 300.0,
     sample_every: int = 5,
+    wind: WindField | None = None,
 ) -> TrajectoryResult:
     """Free-flight (un-guided) trajectory until ground impact or time limit."""
     state = np.empty(7)
@@ -167,7 +175,7 @@ def propagate(
         # stop just after the vehicle returns to the ground while descending
         if state[2] < 0.0 and state[5] < 0.0 and t > 0.0:
             break
-        state = rk4_step(state, t, dt, vehicle, no_lateral, launch_dir)
+        state = rk4_step(state, t, dt, vehicle, no_lateral, launch_dir, wind)
         t += dt
         step += 1
 
@@ -184,6 +192,7 @@ def propagate_staged(
     dt: float = 0.02,
     max_time: float = 300.0,
     sample_every: int = 5,
+    wind: WindField | None = None,
 ) -> tuple[TrajectoryResult, list[dict]]:
     """Un-guided staged flight: drop spent-stage mass at separation events.
 
@@ -214,7 +223,7 @@ def propagate_staged(
             _record(res, state, t, origin)
         if state[2] < 0.0 and state[5] < 0.0 and t > 0.0:
             break
-        state = rk4_step(state, t, dt, vehicle, no_lateral, launch_dir)
+        state = rk4_step(state, t, dt, vehicle, no_lateral, launch_dir, wind)
         t += dt
         step += 1
         # Apply any separations crossed during this step.
